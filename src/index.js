@@ -97,7 +97,7 @@ function isValidMove(start, end, board) {
                 queenMoveFunc = (i) => i + 9 * dir;
             } else if (mvmt % 8 === 0) {
                 queenMoveFunc = (i) => i + 8 * dir;
-            } else if (rowStart < end && rowStart + 8 > end) {
+            } else if (rowStart <= end && rowStart + 8 > end) {
                 queenMoveFunc = (i) => i + dir;
             } else {
                 isValid = false;
@@ -203,6 +203,7 @@ class Board extends React.Component {
             captured: [],
             desiredStart: null,
             whitesTurn: true,
+            ignoreTurns: false,
         };
     }
 
@@ -224,7 +225,7 @@ class Board extends React.Component {
             }
 
             if (validMove || validCapture) {
-                var newState = {whitesTurn: !this.state.whitesTurn};
+                var newState = {whitesTurn: !this.state.whitesTurn || this.state.ignoreTurns};
                 if (spaces[i] !== null) {
                     var captured = this.state.captured.slice();
                     captured.push(spaces[i]);
