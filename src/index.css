@@ -1,0 +1,73 @@
+body {
+  font: 14px "Century Gothic", Futura, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.title {
+  text-align: center;
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.subtitle {
+  margin-bottom: 0px;
+}
+
+#capturedPieces {
+  margin-top: 5px;
+}
+
+#game {
+  width: 500px;
+  margin: 0 auto;
+}
+
+#game table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  box-shadow: 0 0 10px -2px #000;
+}
+
+#game td {
+  height: 60px;
+  text-align: center;
+  background-color: #bb9466;
+  padding: 0;
+}
+
+#game tr:nth-child(odd) td:nth-child(even),
+#game tr:nth-child(even) td:nth-child(odd) {
+  background-color: #593c13;
+}
+
+img[src$='.svg'] {
+  width: 60%;
+  height: 60%;
+  margin: 0;
+  padding: 0;
+}
+
+.white img {
+  filter: invert(100%);
+}
+
+#game table tr td.on-deck {
+  background-color: #d6ab79;
+}
+
+#game tr:nth-child(odd) td:nth-child(even).on-deck,
+#game tr:nth-child(even) td:nth-child(odd).on-deck {
+  background-color: #6b491a;
+}
+
+#game td.occupied {
+  cursor: pointer;
+}
+
+.icon-credit {
+  text-align: center;
+  font-size: 10px;
+  margin-bottom: 5px;
+}
