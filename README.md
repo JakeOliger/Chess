@@ -8,6 +8,7 @@ The following features are yet to be implemented.
 * Castling
 * En passant pawn capturing
 * Prevent player from allowing King to be sacrificed
+* History and replay
 * Improve piece selection and movement UI
 * Click outside the game cancels turn
 * Detect end of game

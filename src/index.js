@@ -46,7 +46,7 @@ function isValidMove(start, end, board) {
             var rookMoveFunc;
             if (mvmt % 8 === 0) {
                 rookMoveFunc = (i) => i + 8 * dir;
-            } else if (rowStart < end && rowStart + 8 > end) {
+            } else if (rowStart <= end && rowStart + 8 > end) {
                 rookMoveFunc = (i) => i + dir;
             } else {
                 isValid = false;
