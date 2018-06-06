@@ -9,6 +9,8 @@ The following features are yet to be implemented.
 * En passant pawn capturing
 * Prevent player from allowing King to be sacrificed
 * Improve piece selection and movement UI
+* Click outside the game cancels turn
 * Detect end of game
 * Better display for captured pieces
-* Animate between piece moves (maybe)
+* Animate between piece moves (maybe?)
+* Multiplayer (maybe??)

@@ -201,15 +201,18 @@ class Board extends React.Component {
                 new Pc(R, B), new Pc(KN, B), new Pc(BI, B), new Pc(Q, B), new Pc(KI, B), new Pc(BI, B), new Pc(KN, B), new Pc(R, B),
             ],
             captured: [],
-            desiredStart: null
+            desiredStart: null,
+            whitesTurn: true,
         };
     }
 
     handleClick(i) {
         var spaces = this.state.spaces.slice();
         if (this.state.desiredStart === null) {
-            if (spaces[i] !== null) {
-                this.setState({desiredStart: i});
+            if (spaces[i] !== null && spaces[i].team === (this.state.whitesTurn ? WHITE : BLACK)) {
+                this.setState({
+                    desiredStart: i,
+                });
             }
         } else {
             var validMove = isValidMove(this.state.desiredStart, i, spaces);
@@ -221,7 +224,7 @@ class Board extends React.Component {
             }
 
             if (validMove || validCapture) {
-                var newState = {};
+                var newState = {whitesTurn: !this.state.whitesTurn};
                 if (spaces[i] !== null) {
                     var captured = this.state.captured.slice();
                     captured.push(spaces[i]);
@@ -242,6 +245,7 @@ class Board extends React.Component {
     render() {
         return (
             <div>
+                <p class="whos-turn">{this.state.whitesTurn ? "White's" : "Black's"} Turn</p>
                 <table>
                     <tbody>
                     {[0, 1, 2, 3, 4, 5, 6, 7].map((x, i) => {
