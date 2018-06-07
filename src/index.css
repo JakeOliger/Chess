@@ -26,29 +26,33 @@ body {
 #game table {
   width: 100%;
   table-layout: fixed;
-  border-collapse: collapse;
+  border-spacing: 0;
   box-shadow: 0 0 10px -2px #000;
 }
 
 #game td {
-  height: 60px;
+  height: 59px;
   text-align: center;
   background-color: #e9b67d;
+  border: 1px solid #e9b67d;
   padding: 0;
 }
 
 #game tr:nth-child(odd) td:nth-child(even),
 #game tr:nth-child(even) td:nth-child(odd) {
   background-color: #996721;
+  border-color: #996721;
 }
 
 #game table tr td.on-deck {
   background-color: #ffc786;
+  border-color: #86beff;
 }
 
 #game tr:nth-child(odd) td:nth-child(even).on-deck,
 #game tr:nth-child(even) td:nth-child(odd).on-deck {
   background-color: #b47a28;
+  border-color: #86beff;
 }
 
 img[src$='.svg'] {
@@ -68,6 +72,13 @@ img[src$='.svg'] {
 
 .replay {
   margin-top: 15px;
+  background-color: rgb(93, 144, 255);
+  color: rgb(238, 245, 255);
+  padding: 5px 15px;
+  border-radius: 5px;
+  border: 1px solid rgb(238, 245, 255);
+  cursor: pointer;
+  outline: none;
 }
 
 .icon-credit {
