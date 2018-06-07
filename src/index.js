@@ -7,8 +7,7 @@ import './index.css';
  *      Pros: Easier to iterate through pieces
  *      Cons: Potentially more difficult to check if a space is occupied
  * - Add isKingInCheck(king, board) method
- * 
- * 
+ * - Add dialog for promotion
  */
 
 var [WHITE, BLACK] = [0, 1];
@@ -82,7 +81,7 @@ function isValidMove(start, end, board) {
             }
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
-            for (var i = rookMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = rookMoveFunc(i)) {
+            for (let i = rookMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = rookMoveFunc(i)) {
                 if (board[start - i] !== null) {
                     isValid = false;
                     break;
@@ -106,7 +105,7 @@ function isValidMove(start, end, board) {
             }
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
-            for (var i = bishopMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = bishopMoveFunc(i)) {
+            for (let i = bishopMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = bishopMoveFunc(i)) {
                 if (board[start - i] !== null) {
                     isValid = false;
                     break;
@@ -130,7 +129,7 @@ function isValidMove(start, end, board) {
             }
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
-            for (var i = queenMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = queenMoveFunc(i)) {
+            for (let i = queenMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = queenMoveFunc(i)) {
                 if (board[start - i] !== null) {
                     isValid = false;
                     break;
@@ -151,7 +150,7 @@ function isValidMove(start, end, board) {
                 }
                 if (rookPosition !== null && board[rookPosition].isFirstMove) {
                     isCastling = true;
-                    for (var i = rookPosition + dir; i !== start; i += dir) {
+                    for (let i = rookPosition + dir; i !== start; i += dir) {
                         if (board[i] !== null) {
                             isCastling = false;
                             break;
@@ -261,7 +260,8 @@ class Board extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            spaces: [
+            history: [{
+                board: [
                 new Pc(R, W), new Pc(KN, W), new Pc(BI, W), new Pc(KI, W), new Pc(Q, W), new Pc(BI, W), new Pc(KN, W), new Pc(R, W),
                 new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W),
                 null, null, null, null, null, null, null, null,
@@ -270,69 +270,99 @@ class Board extends React.Component {
                 null, null, null, null, null, null, null, null,
                 new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B),
                 new Pc(R, B), new Pc(KN, B), new Pc(BI, B), new Pc(Q, B), new Pc(KI, B), new Pc(BI, B), new Pc(KN, B), new Pc(R, B),
-            ],
-            captured: [],
+                ],
+                captured: [],
+                whitesTurn: true,
+            }],
+            index: 0,
             desiredStart: null,
-            whitesTurn: true,
             ignoreTurns: false,
+            isReplaying: false,
         };
     }
 
-    cancelTurn() {
+    resetTurn() {
         this.setState({desiredStart: null});
     }
 
     handleClick(i) {
-        var spaces = this.state.spaces.slice();
-        var mover = spaces[this.state.desiredStart];
+        if (this.state.isReplaying) return;
+
+        var board = this.state.history[this.state.index].board.slice();
         var moverSpace = this.state.desiredStart;
         if (moverSpace === null) {
-            if (spaces[i] !== null && spaces[i].team === (this.state.whitesTurn ? WHITE : BLACK)) {
+            if (board[i] !== null && board[i].team === (this.state.history[this.state.index].whitesTurn ? WHITE : BLACK)) {
                 this.setState({
                     desiredStart: i,
                 });
             }
         } else {
-            var move = isValidMove(moverSpace, i, spaces);
-            var capturedPiecePos = isValidCapture(move.isValid, moverSpace, i, spaces);
+            var move = isValidMove(moverSpace, i, board);
+            var capturedPiecePos = isValidCapture(move.isValid, moverSpace, i, board);
             var successfulCapture = capturedPiecePos !== null;
 
-            console.log(move);
-
-            if (spaces[i] !== null && !successfulCapture && !move.isCastling) {
-                this.cancelTurn();
+            if (board[i] !== null && !successfulCapture && !move.isCastling) {
+                this.resetTurn();
                 return;
             }
 
             if (move.isValid || successfulCapture) {
-                var newState = {whitesTurn: !this.state.whitesTurn || this.state.ignoreTurns};
+                var newState = {
+                    whitesTurn: !this.state.history[this.state.index].whitesTurn || this.state.ignoreTurns,
+                    captured: this.state.history[this.state.index].captured.slice()
+                };
+
                 if (successfulCapture) {
-                    var captured = this.state.captured.slice();
-                    captured.push(spaces[capturedPiecePos]);
-                    newState.captured = captured;
-                    spaces[capturedPiecePos] = null;
+                    newState.captured.push(board[capturedPiecePos]);
+                    board[capturedPiecePos] = null;
                 }
 
-                for (var i = 0; i < move.moves.length; i++) {
+                for (let i = 0; i < move.moves.length; i++) {
                     var m = move.moves[i];
-                    console.log(m);
-                    spaces[m.end] = m.piece;
-                    spaces[m.start] = null;
+                    board[m.end] = m.piece;
+                    board[m.start] = null;
                 }
     
-                newState.spaces = spaces;
-                newState.desiredStart = null;
-                this.setState(newState);
-            } else {
-                this.cancelTurn();
+                newState.board = board;
+
+                console.log(newState);
+                var history = this.state.history.slice();
+                history.push(newState);
+                this.setState({
+                    history: history,
+                    index: this.state.index + 1,
+                });
             }
+            this.resetTurn();
         }
     }
 
+    jumpTo(index) {
+        this.setState({index: index});
+    }
+
     render() {
+        let replay =
+            <button className="replay" onClick={() => {
+                if (this.state.isReplaying) return;
+
+                this.setState({isReplaying: true});
+                var i = 0;
+                var intervalId = setInterval(() => {
+                    this.jumpTo(i);
+                    i++;
+                    if (i >= this.state.history.length) {
+                        this.setState({isReplaying: false});
+                        clearInterval(intervalId);
+                    }
+                }, 500);
+            }}>
+                {this.state.isReplaying ? "Replaying..." : "Instant Replay"}
+            </button>;
+
         return (
             <div>
-                <p className="whos-turn">{this.state.whitesTurn ? "White's" : "Black's"} Turn</p>
+                <p className="whos-turn">{this.state.history[this.state.index].whitesTurn ? "White's" : "Black's"} Turn</p>
                 <table>
                     <tbody>
                     {[0, 1, 2, 3, 4, 5, 6, 7].map((x, i) => {
@@ -342,7 +372,7 @@ class Board extends React.Component {
                                     return (
                                         <Space
                                             key={i * 8 + j}
-                                            piece={this.state.spaces[i * 8 + j]}
+                                            piece={this.state.history[this.state.index].board[i * 8 + j]}
                                             id={i * 8 + j}
                                             isOnDeck={(i * 8 + j) === this.state.desiredStart}
                                             onClick={() => this.handleClick(i * 8 + j)}
@@ -354,11 +384,12 @@ class Board extends React.Component {
                     })}
                     </tbody>
                 </table>
+                <div>{replay}</div>
                 <h3 className="subtitle">Captured Pieces</h3>
                 <ul id="capturedPieces">
-                    {this.state.captured.map((piece, index) => {
+                    {this.state.history[this.state.index].captured.map((piece, index) => {
                         return (
-                            <li>{TEAM_NAME[piece.team]} {PIECE_NAME[piece.type]}</li>
+                            <li key={index}>{TEAM_NAME[piece.team]} {PIECE_NAME[piece.type]}</li>
                         );
                     })}
                 </ul>

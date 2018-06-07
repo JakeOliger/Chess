@@ -7,7 +7,6 @@ An age-old game, re-imagined using an age-new framework. This is my second proje
 The following features are yet to be implemented.
 * Pawn promotion
 * Check/checkmate rules
-* History and replay
 * Improve piece selection and movement UI
 * Click outside the game cancels turn
 * Better display for captured pieces

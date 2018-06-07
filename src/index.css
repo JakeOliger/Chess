@@ -66,6 +66,10 @@ img[src$='.svg'] {
   cursor: pointer;
 }
 
+.replay {
+  margin-top: 15px;
+}
+
 .icon-credit {
   text-align: center;
   font-size: 10px;
