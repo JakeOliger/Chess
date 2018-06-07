@@ -261,7 +261,7 @@ class Board extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            /*spaces: [
+            spaces: [
                 new Pc(R, W), new Pc(KN, W), new Pc(BI, W), new Pc(KI, W), new Pc(Q, W), new Pc(BI, W), new Pc(KN, W), new Pc(R, W),
                 new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W),
                 null, null, null, null, null, null, null, null,
@@ -270,16 +270,6 @@ class Board extends React.Component {
                 null, null, null, null, null, null, null, null,
                 new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B),
                 new Pc(R, B), new Pc(KN, B), new Pc(BI, B), new Pc(Q, B), new Pc(KI, B), new Pc(BI, B), new Pc(KN, B), new Pc(R, B),
-            ],*/
-            spaces: [
-                new Pc(R, W), null, null, new Pc(KI, W), null, null, null, new Pc(R, W),
-                new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W),
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B),
-                new Pc(R, B), new Pc(KN, B), null, null, new Pc(KI, B), new Pc(KN, B), null, new Pc(R, B),
             ],
             captured: [],
             desiredStart: null,
