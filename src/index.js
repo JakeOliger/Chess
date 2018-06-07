@@ -6,7 +6,7 @@ import './index.css';
  * - Replace board representation with an array of only pieces and positions
  *      Pros: Easier to iterate through pieces
  *      Cons: Potentially more difficult to check if a space is occupied
- * - Add isKingInCheck(king, board) method
+ * - Enforce check rules
  * - Add dialog for promotion
  */
 
@@ -31,6 +31,15 @@ var PIECE_NAME = [
     "Bishop",
     "Queen",
     "King",
+];
+var PIECE_NAME_LC = [
+    "",
+    "pawn",
+    "rook",
+    "knight",
+    "bishop",
+    "queen",
+    "king",
 ];
 
 /**
@@ -273,6 +282,7 @@ class Board extends React.Component {
                 ],
                 captured: [],
                 whitesTurn: true,
+                kingStatus: "",
             }],
             index: 0,
             desiredStart: null,
@@ -285,11 +295,32 @@ class Board extends React.Component {
         this.setState({desiredStart: null});
     }
 
+    /*isKingInCheck(kingPosition, board) {
+        var king = board[kingPosition];
+        for (let i = 0; i < board.length; i++) {
+            if (board[i] === null || board[i].team === king.team || i === kingPosition) continue;
+            let move = isValidMove(i, kingPosition, board);
+            let capture = isValidCapture(move.isValid, i, kingPosition, board);
+            if (capture) return true;
+        }
+    }*/
+
+    isKingInCheck(kingPosition, pieces, board) {
+        var king = board[kingPosition];
+        for (let i = 0; i < pieces.length; i++) {
+            let move = isValidMove(pieces[i].location, kingPosition, board);
+            if (isValidCapture(move.isValid, pieces[i].location, kingPosition, board)) {
+                return true;
+            }
+        }
+    }
+
     handleClick(i) {
         if (this.state.isReplaying) return;
 
         var board = this.state.history[this.state.index].board.slice();
         var moverSpace = this.state.desiredStart;
+        var mover = board[moverSpace];
         if (moverSpace === null) {
             if (board[i] !== null && board[i].team === (this.state.history[this.state.index].whitesTurn ? WHITE : BLACK)) {
                 this.setState({
@@ -322,10 +353,39 @@ class Board extends React.Component {
                     board[m.end] = m.piece;
                     board[m.start] = null;
                 }
+
+                // Prepare pieces for check check
+                let whitePieces = [];
+                let whiteKing = null;
+                let blackPieces = [];
+                let blackKing = null;
+                for (let i = 0; i < board.length; i++) {
+                    if (board[i] === null) continue;
+                    if (board[i].team === WHITE) {
+                        if (board[i].type === KING) {
+                            whiteKing = {location: i, piece: board[i]};
+                        } else {
+                            whitePieces.push({location: i, piece: board[i]});
+                        }
+                    } else {
+                        if (board[i].type === KING) {
+                            blackKing = {location: i, piece: board[i]};
+                        } else {
+                            blackPieces.push({location: i, piece: board[i]});
+                        }
+                    }
+                }
+
+                if (this.isKingInCheck(whiteKing.location, blackPieces, board)) {
+                    newState.kingStatus = "White king in check!";
+                }
+
+                if (this.isKingInCheck(blackKing.location, whitePieces, board)) {
+                    newState.kingStatus = "Black king in check!";                    
+                }
     
                 newState.board = board;
 
-                console.log(newState);
                 var history = this.state.history.slice();
                 history.push(newState);
                 this.setState({
@@ -362,7 +422,10 @@ class Board extends React.Component {
 
         return (
             <div>
-                <p className="whos-turn">{this.state.history[this.state.index].whitesTurn ? "White's" : "Black's"} Turn</p>
+                <p className="status-bar">
+                    <span className="whos-turn">{this.state.history[this.state.index].whitesTurn ? "White's" : "Black's"} Turn</span>
+                    <span className="king-status">{this.state.history[this.state.index].kingStatus}</span>
+                </p>
                 <table>
                     <tbody>
                     {[0, 1, 2, 3, 4, 5, 6, 7].map((x, i) => {

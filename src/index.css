@@ -86,3 +86,7 @@ img[src$='.svg'] {
   font-size: 10px;
   margin-bottom: 5px;
 }
+
+.status-bar .king-status {
+  float: right;
+}
