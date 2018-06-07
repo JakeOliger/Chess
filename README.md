@@ -5,13 +5,11 @@ An age-old game, re-imagined using an age-new framework. This is my second proje
 ### Todo
 
 The following features are yet to be implemented.
-* Castling
-* En passant pawn capturing
-* Prevent player from allowing King to be sacrificed
+* Pawn promotion
+* Check/checkmate rules
 * History and replay
 * Improve piece selection and movement UI
 * Click outside the game cancels turn
-* Detect end of game
 * Better display for captured pieces
 * Animate between piece moves (maybe?)
 * Multiplayer (maybe??)
