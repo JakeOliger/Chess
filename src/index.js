@@ -54,17 +54,6 @@ var PIECE_NAME_LC = [
     "king",
 ];
 
-var regulationStartingBoard = [
-    new Pc(R, W), new Pc(KN, W), new Pc(BI, W), new Pc(KI, W), new Pc(Q, W), new Pc(BI, W), new Pc(KN, W), new Pc(R, W),
-    new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W),
-    null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, null,
-    new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B),
-    new Pc(R, B), new Pc(KN, B), new Pc(BI, B), new Pc(Q, B), new Pc(KI, B), new Pc(BI, B), new Pc(KN, B), new Pc(R, B),
-];
-
 var regulationStartingPieces = {
     "0,0": new Pc(R, W), "1,0": new Pc(KN, W), "2,0": new Pc(BI, W), "3,0": new Pc(KI, W),
     "4,0": new Pc(Q, W), "5,0": new Pc(BI, W), "6,0": new Pc(KN, W), "7,0": new Pc(R, W), 
@@ -76,12 +65,7 @@ var regulationStartingPieces = {
     "4,7": new Pc(KI, B), "5,7": new Pc(BI, B), "6,7": new Pc(KN, B), "7,7": new Pc(R, B),
 };
 
-var castlingTestingPieces = [
-    new Pc(R, W, 0, 0), new Pc(KI, W, 3, 0), new Pc(BI, W, 5, 0), new Pc(R, W, 7, 0), new Pc(BI, W, 0, 2),
-    new Pc(BI, B, 7, 5), new Pc(R, B, 0, 7), new Pc(BI, B, 2, 7), new Pc(KI, B, 4, 7), new Pc(R, B, 7, 7),
-];
-
-var castlingTestingPieces2 = {
+var castlingTestingPieces = {
     "0,0": new Pc(R, W), "3,0": new Pc(KI, W), "5,0": new Pc(BI, W), "7,0": new Pc(R, W),
     "2,1": new Pc(P, W),
     "0,2": new Pc(BI, W),
@@ -89,17 +73,6 @@ var castlingTestingPieces2 = {
     "5,6": new Pc(P, B),
     "0,7": new Pc(R, B), "2,7": new Pc(BI, B), "4,7": new Pc(KI, B), "7,7": new Pc(R, B)
 };
-
-var castlingTestingBoard = [
-    new Pc(R, W), null, null, new Pc(KI, W), null, new Pc(BI, W), null, new Pc(R, W),
-    null, null, null, null, null, null, null, null,
-    new Pc(BI, W), null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, null,
-    null, null, null, null, null, null, null, new Pc(BI, B),
-    null, null, null, null, null, null, null, null,
-    new Pc(R, B), null, new Pc(BI, B), null, new Pc(KI, B), null, null, new Pc(R, B),
-];
 
 /**
  * Determines whether the attempted move is valid
@@ -152,10 +125,13 @@ function isValidMove(piece, dest, pieces) {
                 break;
             }
             isValid = true;
+            function boolog(msg) { console.log(msg); return true; }
             // Check to make sure all spaces between here and the destination are clear
-            for (let l = rookMoveFunc(piece.x, piece.y); l.x !== dest.x && l.y !== dest.y; l = rookMoveFunc(l.x, l.y)) {
+            for (let l = rookMoveFunc(piece.x, piece.y); boolog(l.x !== dest.x && l.y !== dest.y) && l.x !== dest.x && l.y !== dest.y; l = rookMoveFunc(l.x, l.y)) {
+                console.log("Test");
                 if (getPiece(l.x, l.y, pieces) !== null) {
                     isValid = false;
+                    console.log("Ain't valid");
                     break;
                 }
             }
@@ -165,24 +141,19 @@ function isValidMove(piece, dest, pieces) {
             mvmt.y = Math.abs(mvmt.y);
             isValid = (mvmt.x === 2 && mvmt.y === 1) || (mvmt.x === 1 && mvmt.y === 2);
             break;
-        /*case BISHOP:
+        case BISHOP:
             // Determine if the requested move matches a movement function for this piece
-            var bishopMoveFunc;
-            console.log("end%8:   " + (end % 8));
-            console.log("start%8: " + (start % 8));
-            if (end % 8 < start % 8) {
-                bishopMoveFunc = (i) => i + 7 * dir;
-            } else if (end % 8 > start % 8) {
-                bishopMoveFunc = (i) => i + 9 * dir;
-            } else {
-                break;
-            }
+            if (Math.abs(mvmt.x) !== Math.abs(mvmt.y)) break;
+            var bishopMoveFunc = (x, y) => {
+                return {
+                    x: x + dir.x,
+                    y: y + dir.y,
+                };
+            };
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
-            console.log("Checking bishop spots");
-            for (let i = bishopMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = bishopMoveFunc(i)) {
-                console.log(start - i);
-                if (board[start - i] !== null) {
+            for (let l = bishopMoveFunc(piece.x, piece.y); l.x !== dest.x && l.y !== dest.y; l = bishopMoveFunc(l.x, l.y)) {
+                if (getPiece(l.x, l.y, pieces) !== null) {
                     isValid = false;
                     break;
                 }
@@ -191,27 +162,30 @@ function isValidMove(piece, dest, pieces) {
         case QUEEN:
             // Determine if the requested move matches a movement function for this piece
             var queenMoveFunc;
-            if (mvmt % 7 === 0) {
-                queenMoveFunc = (i) => i + 7 * dir;
-            } else if (mvmt % 9 === 0) {
-                queenMoveFunc = (i) => i + 9 * dir;
-            } else if (mvmt % 8 === 0) {
-                queenMoveFunc = (i) => i + 8 * dir;
-            } else if (rowStart <= end && rowStart + 7 >= end) {
-                queenMoveFunc = (i) => i + dir;
+            if (mvmt.y !== 0 && mvmt.x === 0) {
+                queenMoveFunc = (x, y) => { return {x: x, y: y + dir.y} }
+            } else if (mvmt.x !== 0 && mvmt.y === 0) {
+                queenMoveFunc = (x, y) => { return {x: x + dir.x, y: y} }
+            } else if (Math.abs(mvmt.x) === Math.abs(mvmt.y)) {
+                queenMoveFunc = (x, y) => {
+                    return {
+                        x: x + dir.x,
+                        y: y + dir.y,
+                    };
+                };
             } else {
                 break;
             }
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
-            for (let i = queenMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = queenMoveFunc(i)) {
-                if (board[start - i] !== null) {
+            for (let l = queenMoveFunc(piece.x, piece.y); l.x !== dest.x && l.y !== dest.y; l = queenMoveFunc(l.x, l.y)) {
+                if (getPiece(l.x, l.y, pieces) !== null) {
                     isValid = false;
                     break;
                 }
             }
             break;
-        case KING:
+        /*case KING:
             // If the place the king is moving to is in check, don't allow it
             var absMvmt = Math.abs(mvmt);
             var rowEnd = rowStart + 7;
@@ -378,6 +352,7 @@ class Space extends React.Component {
         var type = this.props.piece.type !== null ? PIECE_NAME_LC[this.props.piece.type] : "";
         var team = this.props.piece.team !== null ? TEAM_NAME_LC[this.props.piece.team] : "";
         var className = team;
+        var coords = this.props.showCoords ? <span className="spotId">{this.props.pos}</span> : null;
         var img = null;
 
         if (type !== "" && team !== "") {
@@ -387,7 +362,7 @@ class Space extends React.Component {
         }
         
         return (
-            <td className={className} onClick={this.props.onClick}><span className="spotId">{this.props.pos}</span>{img}</td>
+            <td className={className} onClick={this.props.onClick}>{coords}{img}</td>
         );
     }
 }
@@ -406,6 +381,7 @@ class Board extends React.Component {
             pieceToMove: null,
             ignoreTurns: false,
             isReplaying: false,
+            showCoords: false,
         };
     }
 
@@ -419,7 +395,6 @@ class Board extends React.Component {
         var pieceToMove = this.state.pieceToMove;
         var pieces = JSON.parse(JSON.stringify(this.state.history[this.state.index].pieces));
         var clickedPiece = getPiece(x, y, pieces);
-        var clickedSpace = {x: x, y: y};
 
         if (this.state.pieceToMove === null) {
             if (clickedPiece !== null && clickedPiece.team === (this.state.history[this.state.index].whitesTurn ? WHITE : BLACK)) {
@@ -540,6 +515,7 @@ class Board extends React.Component {
                                             key={x + "," + y}
                                             pos={x + "," + y}
                                             piece={getPiece(x, y, this.state.history[this.state.index].pieces)}
+                                            showCoords={this.state.showCoords}
                                             x={x}
                                             y={y}
                                             isOnDeck={this.state.pieceToMove !== null && (this.state.pieceToMove.x === x && this.state.pieceToMove.y === y)}
