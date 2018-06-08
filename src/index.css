@@ -23,6 +23,10 @@ body {
   margin: 0 auto;
 }
 
+#game .pieceTray {
+  background-color: rgb(197, 148, 91);
+}
+
 #game table {
   width: 100%;
   table-layout: fixed;
@@ -33,15 +37,16 @@ body {
 #game td {
   height: 59px;
   text-align: center;
-  background-color: #e9b67d;
-  border: 1px solid #e9b67d;
+  background-color: rgb(233,182,125);
+  border: 1px solid rgb(233,182,125);
   padding: 0;
+  position: relative;
 }
 
 #game tr:nth-child(odd) td:nth-child(even),
 #game tr:nth-child(even) td:nth-child(odd) {
-  background-color: #996721;
-  border-color: #996721;
+  background-color: rgb(153, 103, 33);
+  border-color: rgb(153, 103, 33);
 }
 
 #game table tr td.on-deck {
@@ -55,9 +60,9 @@ body {
   border-color: #86beff;
 }
 
-img[src$='.svg'] {
-  width: 60%;
-  height: 60%;
+#game td img {
+  width: 50px;
+  height: 50px;
   margin: 0;
   padding: 0;
 }
@@ -81,12 +86,24 @@ img[src$='.svg'] {
   outline: none;
 }
 
-.icon-credit {
+.footer {
+  position: fixed;
+  bottom: 0px;
+  left: 0px;
+  right: 0px;
   text-align: center;
-  font-size: 10px;
-  margin-bottom: 5px;
+  font-size: 12px;
+  padding: 10px;
+  background-color: rgba(93, 144, 255, 0.25);
 }
 
 .status-bar .king-status {
   float: right;
+}
+
+.spotId {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 10px;
 }

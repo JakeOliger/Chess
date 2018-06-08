@@ -7,8 +7,20 @@ import './index.css';
  *      Pros: Easier to iterate through pieces
  *      Cons: Potentially more difficult to check if a space is occupied
  * - Enforce check rules
+ *      - Determine why castling check check is not working
  * - Add dialog for promotion
  */
+
+class Pc {
+    constructor(type, team, x, y) {
+        this.type = type;
+        this.team = team;
+        this.isFirstMove = true;
+        this.justDoubleMoved = false;
+        if (x !== undefined) this.x = x;
+        if (y !== undefined) this.y = y;
+    }
+}
 
 var [WHITE, BLACK] = [0, 1];
 var [W, B] = [WHITE, BLACK];
@@ -42,79 +54,134 @@ var PIECE_NAME_LC = [
     "king",
 ];
 
+var regulationStartingBoard = [
+    new Pc(R, W), new Pc(KN, W), new Pc(BI, W), new Pc(KI, W), new Pc(Q, W), new Pc(BI, W), new Pc(KN, W), new Pc(R, W),
+    new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W),
+    null, null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null,
+    new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B),
+    new Pc(R, B), new Pc(KN, B), new Pc(BI, B), new Pc(Q, B), new Pc(KI, B), new Pc(BI, B), new Pc(KN, B), new Pc(R, B),
+];
+
+var regulationStartingPieces = {
+    "0,0": new Pc(R, W), "1,0": new Pc(KN, W), "2,0": new Pc(BI, W), "3,0": new Pc(KI, W),
+    "4,0": new Pc(Q, W), "5,0": new Pc(BI, W), "6,0": new Pc(KN, W), "7,0": new Pc(R, W), 
+    "0,1": new Pc(P, W), "1,1": new Pc(P, W), "2,1": new Pc(P, W), "3,1": new Pc(P, W),
+    "4,1": new Pc(P, W), "5,1": new Pc(P, W), "6,1": new Pc(P, W), "7,1": new Pc(P, W),
+    "0,6": new Pc(P, B), "1,6": new Pc(P, B), "2,6": new Pc(P, B), "3,6": new Pc(P, B),
+    "4,6": new Pc(P, B), "5,6": new Pc(P, B), "6,6": new Pc(P, B), "7,6": new Pc(P, B),
+    "0,7": new Pc(R, B), "1,7": new Pc(KN, B), "2,7": new Pc(BI, B), "3,7": new Pc(Q, B),
+    "4,7": new Pc(KI, B), "5,7": new Pc(BI, B), "6,7": new Pc(KN, B), "7,7": new Pc(R, B),
+};
+
+var castlingTestingPieces = [
+    new Pc(R, W, 0, 0), new Pc(KI, W, 3, 0), new Pc(BI, W, 5, 0), new Pc(R, W, 7, 0), new Pc(BI, W, 0, 2),
+    new Pc(BI, B, 7, 5), new Pc(R, B, 0, 7), new Pc(BI, B, 2, 7), new Pc(KI, B, 4, 7), new Pc(R, B, 7, 7),
+];
+
+var castlingTestingPieces2 = {
+    "0,0": new Pc(R, W), "3,0": new Pc(KI, W), "5,0": new Pc(BI, W), "7,0": new Pc(R, W),
+    "2,1": new Pc(P, W),
+    "0,2": new Pc(BI, W),
+    "7,5": new Pc(BI, B),
+    "5,6": new Pc(P, B),
+    "0,7": new Pc(R, B), "2,7": new Pc(BI, B), "4,7": new Pc(KI, B), "7,7": new Pc(R, B)
+};
+
+var castlingTestingBoard = [
+    new Pc(R, W), null, null, new Pc(KI, W), null, new Pc(BI, W), null, new Pc(R, W),
+    null, null, null, null, null, null, null, null,
+    new Pc(BI, W), null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, null,
+    null, null, null, null, null, null, null, new Pc(BI, B),
+    null, null, null, null, null, null, null, null,
+    new Pc(R, B), null, new Pc(BI, B), null, new Pc(KI, B), null, null, new Pc(R, B),
+];
+
 /**
  * Determines whether the attempted move is valid
  *
- * @param {*} start The start position of the move, also used to determine moving piece
- * @param {*} end The end position of the move
+ * @param {*} piece The start piece, with x and y specified as properties
+ * @param {*} dest The end position of the move, with x and y specified as properties
  * @param {*} board The array of piece positions on the board
  * @returns
  */
-function isValidMove(start, end, board) {
+function isValidMove(piece, dest, pieces) {
     var isValid = false;
-    var mvmt = start - end;
-    var piece = board[start];
-    var dir = mvmt > 0 ? 1 : -1;
-    var rowStart = start - start % 8;
+    var mvmt = {
+        x: dest.x - piece.x,
+        y: dest.y - piece.y,
+    };
+    var dir = {
+        x: mvmt.x < 0 ? -1 : 1,
+        y: mvmt.y < 0 ? -1 : 1,
+    }
     var moves = [{
         piece: piece,
-        start: start,
-        end: end
+        start: {x: piece.x, y: piece.y},
+        end: dest
     }];
     var isCastling = false;
     switch (piece.type) {
         case PAWN:
-            var maxMvmt = 8 * (piece.team === B ? 1 : -1);
-            isValid = mvmt % 8 === 0 && (piece.team === B ? mvmt > 0 : mvmt < 0);
+            if (mvmt.x !== 0) {
+                isValid = false;
+                break;
+            }
+            var maxMvmt = piece.team === WHITE ? 1 : -1;
+            isValid = Math.abs(mvmt.y) <= 2 && (piece.team === WHITE ? mvmt.y > 0 : mvmt.y < 0);
             if (isValid) {
                 if (piece.isFirstMove) {
-                    isValid = board[start - maxMvmt] === null;
+                    isValid = getPiece(piece.x, piece.y + maxMvmt, pieces) === null;
                     maxMvmt *= 2;
-                    piece.justDoubleMoved = true;
-                } else {
-                    piece.justDoubleMoved = false;
                 }
-                isValid = isValid && (piece.team === B ? mvmt <= maxMvmt : mvmt >= maxMvmt);
+                isValid = isValid && (piece.team === WHITE ? mvmt.y <= maxMvmt : mvmt.y >= maxMvmt);
             }
             break;
         case ROOK:
             // Determine if the requested move matches a movement function for this piece
             var rookMoveFunc;
-            if (mvmt % 8 === 0) {
-                rookMoveFunc = (i) => i + 8 * dir;
-            } else if (rowStart <= end && rowStart + 7 >= end) {
-                rookMoveFunc = (i) => i + dir;
+            if (mvmt.y !== 0 && mvmt.x === 0) {
+                rookMoveFunc = (x, y) => { return {x: x, y: y + dir.y} }
+            } else if (mvmt.x !== 0 && mvmt.y === 0) {
+                rookMoveFunc = (x, y) => { return {x: x + dir.x, y: y} }
             } else {
-                isValid = false;
                 break;
             }
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
-            for (let i = rookMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = rookMoveFunc(i)) {
-                if (board[start - i] !== null) {
+            for (let l = rookMoveFunc(piece.x, piece.y); l.x !== dest.x && l.y !== dest.y; l = rookMoveFunc(l.x, l.y)) {
+                if (getPiece(l.x, l.y, pieces) !== null) {
                     isValid = false;
                     break;
                 }
             }
             break;
         case KNIGHT:
-            mvmt = Math.abs(mvmt);
-            isValid = mvmt === 17 || mvmt === 15 || mvmt === 6 || mvmt === 10;
+            mvmt.x = Math.abs(mvmt.x);
+            mvmt.y = Math.abs(mvmt.y);
+            isValid = (mvmt.x === 2 && mvmt.y === 1) || (mvmt.x === 1 && mvmt.y === 2);
             break;
-        case BISHOP:
+        /*case BISHOP:
             // Determine if the requested move matches a movement function for this piece
             var bishopMoveFunc;
-            if (mvmt % 7 === 0) {
+            console.log("end%8:   " + (end % 8));
+            console.log("start%8: " + (start % 8));
+            if (end % 8 < start % 8) {
                 bishopMoveFunc = (i) => i + 7 * dir;
-            } else if (mvmt % 9 === 0) {
+            } else if (end % 8 > start % 8) {
                 bishopMoveFunc = (i) => i + 9 * dir;
             } else {
-                isValid = false;
                 break;
             }
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
+            console.log("Checking bishop spots");
             for (let i = bishopMoveFunc(0); dir > 0 ? i < mvmt : i > mvmt; i = bishopMoveFunc(i)) {
+                console.log(start - i);
                 if (board[start - i] !== null) {
                     isValid = false;
                     break;
@@ -133,7 +200,6 @@ function isValidMove(start, end, board) {
             } else if (rowStart <= end && rowStart + 7 >= end) {
                 queenMoveFunc = (i) => i + dir;
             } else {
-                isValid = false;
                 break;
             }
             isValid = true;
@@ -146,6 +212,7 @@ function isValidMove(start, end, board) {
             }
             break;
         case KING:
+            // If the place the king is moving to is in check, don't allow it
             var absMvmt = Math.abs(mvmt);
             var rowEnd = rowStart + 7;
             isValid = absMvmt === 1 || absMvmt === 7 || absMvmt === 8 || absMvmt === 9;
@@ -165,6 +232,9 @@ function isValidMove(start, end, board) {
                             break;
                         }
                     }
+                    // Check if king is in check -- saving most complex calculation for last
+                    isCastling = !isKingInCheckWholeBoard(start, board) &&
+                        !isKingInCheckWholeBoard(start - dir, board, piece.team);
                 }
                 if (isCastling) {
                     isValid = true;
@@ -175,49 +245,85 @@ function isValidMove(start, end, board) {
                     });
                 }
             }
-            break;
+            isValid = isValid && !isKingInCheckWholeBoard(end, board, piece.team);
+            break;*/
         default:
             isValid = false;
             break;
     }
-    if (isValid) piece.isFirstMove = false;
     return {isValid: isValid, moves: moves, isCastling: isCastling};
+}
+
+function isKingInCheckWholeBoard(kingPosition, board, kingTeam) {
+    var king = board[kingPosition];
+    if (kingTeam === undefined) {
+        kingTeam = king !== null ? king.team : null;
+    }
+    for (let i = 0; i < board.length; i++) {
+        if (board[i] === null || i === kingPosition) continue;
+        let kingExists_isOnTeam =
+            king !== null && board[i].team === king.team;
+        let kingHypothetical_isOnTeam =
+            kingTeam !== null && board[i].team === kingTeam;
+        if (kingExists_isOnTeam || kingHypothetical_isOnTeam) {
+            continue;
+        }
+        let move = isValidMove(i, kingPosition, board);
+        let capture = isValidCapture(move.isValid, i, kingPosition, board, king === null);
+        if (capture) return {location: i, piece: board[i]};
+    }
+}
+
+function isKingInCheckSpecificPieces(kingPosition, pieces, board) {
+    var king = board[kingPosition];
+    for (let i = 0; i < pieces.length; i++) {
+        let move = isValidMove(pieces[i].location, kingPosition, board);
+        if (isValidCapture(move.isValid, pieces[i].location, kingPosition, board, king === null)) {
+            return pieces[i];
+        }
+    }
 }
 
 /**
  * Determines whether a given move results in a valid vapture
  *
  * @param {*} validMove Whether the move is valid
- * @param {*} start The starting position of the move
- * @param {*} end The end position of the move
- * @param {*} board The array of pieces on the board
+ * @param {*} captor The starting position of the move
+ * @param {*} captive The end position of the move
+ * @param {*} pieces The array of pieces on the board
  * @returns The captured piece, if there is one
  */
-function isValidCapture(validMove, start, end, board) {
-    var captor = board[start];
-    var captive = null;
-    var captivePos = end;
-    if (captor.type === PAWN && board[end] === null) {
-        // En passant capturing detection
-        captivePos += (captor.team === WHITE ? -8 : 8);
-    }
-    captive = board[captivePos];
-    if (captor === null || captive === null) return null;
+function isValidCapture(validMove, captor, captivePos, pieces, hypothetical) {
+    hypothetical = hypothetical || false;
+    var captive = getPiece(captivePos.x, captivePos.y, pieces);
+    var dest = {x: captivePos.x, y: captivePos.y};
+    var enPassant = false;
     var isValid = false;
-    var mvmt = start - end;
+    var mvmt;
+    if (hypothetical) {
+        captive = {team: (captor.team === WHITE ? BLACK : WHITE), justDoubleMoved: false};
+    } else if (captor.type === PAWN && captive === null) {
+        // En passant capturing detection
+        enPassant = true;
+        captivePos.y += (captor.team === WHITE ? -1 : 1);
+        captive = getPiece(captivePos.x, captivePos.y, pieces);
+    }
+    if (captor === null || captive === null) return null;
+    mvmt = {
+        x: dest.x - captor.x,
+        y: dest.y - captor.y,
+    };
     if (captor.team === captive.team) return null;
-
     switch (captor.type) {
         case PAWN:
             if (validMove ||
-                (captor.team === B && mvmt < 0) ||
-                (captor.team === W && mvmt > 0) ||
-                (captivePos !== end && !captive.justDoubleMoved)) {
+                (captor.team === B && mvmt.y > 0) ||
+                (captor.team === W && mvmt.y < 0) ||
+                (enPassant && !captive.justDoubleMoved)) {
                 isValid = false;
                 break;
             }
-            mvmt = Math.abs(mvmt);
-            isValid = mvmt === 7 || mvmt === 9;
+            isValid = (Math.abs(mvmt.x) === 1 && Math.abs(mvmt.y) === 1) || enPassant;
             break;
         case ROOK:
         case KNIGHT:
@@ -233,34 +339,55 @@ function isValidCapture(validMove, start, end, board) {
     return (isValid ? captivePos : null);
 }
 
-class Pc {
-    constructor(type, team) {
-        this.type = type;
-        this.team = team;
-        this.isFirstMove = true;
-        this.justDoubleMoved = false;
+function getPiece(x, y, pieces) {
+    if (isNaN(x) || isNaN(y) || !pieces) return null;
+    let key = x + "," + y;
+    if (pieces.hasOwnProperty(key)) {
+        return Object.assign(pieces[key], {x: x, y: y});
     }
+    return null;
+}
+
+function removePiece(x, y, pieces) {
+    if (isNaN(x) || isNaN(y) || !pieces) return;
+    let key = x + "," + y;
+    let piece = pieces[key];
+    delete pieces[key];
+    return piece;
+}
+
+function movePiece(start, end, pieces) {
+    if (getPiece(end.x, end.y, pieces)) {
+        console.error("Tried moving a piece to an occupied space!");
+        return;
+    }
+    let piece = removePiece(start.x, start.y, pieces);
+    if (Math.abs(start.y - end.y) === 2 && piece.type === PAWN) {
+        piece.justDoubleMoved = true;
+    }
+    piece.isFirstMove = false;
+    pieces[end.x + "," + end.y] = piece;
 }
 
 class Space extends React.Component {
     render() {
-        if (this.props.piece === null) {
+        if (!this.props.piece) {
             return (<td onClick={this.props.onClick}></td>);
         }
         
-        var type = this.props.piece.type !== null ? PIECE_NAME[this.props.piece.type] : "";
+        var type = this.props.piece.type !== null ? PIECE_NAME_LC[this.props.piece.type] : "";
         var team = this.props.piece.team !== null ? TEAM_NAME_LC[this.props.piece.team] : "";
         var className = team;
         var img = null;
 
         if (type !== "" && team !== "") {
-            img = <img src={require(`../public/images/${type}.svg`)} alt={`${type}`} />;
+            img = <img src={require(`../public/images/${type}.png`)} alt={`${type}`} />;
             className += (className.length > 0 ? " " : "") + "occupied";
             className += this.props.isOnDeck ? " on-deck" : "";
         }
         
         return (
-            <td className={className} onClick={this.props.onClick}>{img}</td>
+            <td className={className} onClick={this.props.onClick}><span className="spotId">{this.props.pos}</span>{img}</td>
         );
     }
 }
@@ -270,69 +397,44 @@ class Board extends React.Component {
         super(props);
         this.state = {
             history: [{
-                board: [
-                new Pc(R, W), new Pc(KN, W), new Pc(BI, W), new Pc(KI, W), new Pc(Q, W), new Pc(BI, W), new Pc(KN, W), new Pc(R, W),
-                new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W), new Pc(P, W),
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null,
-                new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B), new Pc(P, B),
-                new Pc(R, B), new Pc(KN, B), new Pc(BI, B), new Pc(Q, B), new Pc(KI, B), new Pc(BI, B), new Pc(KN, B), new Pc(R, B),
-                ],
+                pieces: regulationStartingPieces,
                 captured: [],
                 whitesTurn: true,
                 kingStatus: "",
             }],
             index: 0,
-            desiredStart: null,
+            pieceToMove: null,
             ignoreTurns: false,
             isReplaying: false,
         };
     }
 
     resetTurn() {
-        this.setState({desiredStart: null});
+        this.setState({pieceToMove: null});
     }
 
-    /*isKingInCheck(kingPosition, board) {
-        var king = board[kingPosition];
-        for (let i = 0; i < board.length; i++) {
-            if (board[i] === null || board[i].team === king.team || i === kingPosition) continue;
-            let move = isValidMove(i, kingPosition, board);
-            let capture = isValidCapture(move.isValid, i, kingPosition, board);
-            if (capture) return true;
-        }
-    }*/
-
-    isKingInCheck(kingPosition, pieces, board) {
-        var king = board[kingPosition];
-        for (let i = 0; i < pieces.length; i++) {
-            let move = isValidMove(pieces[i].location, kingPosition, board);
-            if (isValidCapture(move.isValid, pieces[i].location, kingPosition, board)) {
-                return true;
-            }
-        }
-    }
-
-    handleClick(i) {
+    handleClick(x, y) {
         if (this.state.isReplaying) return;
 
-        var board = this.state.history[this.state.index].board.slice();
-        var moverSpace = this.state.desiredStart;
-        var mover = board[moverSpace];
-        if (moverSpace === null) {
-            if (board[i] !== null && board[i].team === (this.state.history[this.state.index].whitesTurn ? WHITE : BLACK)) {
+        var pieceToMove = this.state.pieceToMove;
+        var pieces = JSON.parse(JSON.stringify(this.state.history[this.state.index].pieces));
+        var clickedPiece = getPiece(x, y, pieces);
+        var clickedSpace = {x: x, y: y};
+
+        if (this.state.pieceToMove === null) {
+            if (clickedPiece !== null && clickedPiece.team === (this.state.history[this.state.index].whitesTurn ? WHITE : BLACK)) {
+                clickedPiece.x = x;
+                clickedPiece.y = y;
                 this.setState({
-                    desiredStart: i,
+                    pieceToMove: clickedPiece,
                 });
             }
         } else {
-            var move = isValidMove(moverSpace, i, board);
-            var capturedPiecePos = isValidCapture(move.isValid, moverSpace, i, board);
+            var move = isValidMove(pieceToMove, {x: x, y: y}, pieces);
+            var capturedPiecePos = isValidCapture(move.isValid, pieceToMove, {x: x, y: y}, pieces);
             var successfulCapture = capturedPiecePos !== null;
-
-            if (board[i] !== null && !successfulCapture && !move.isCastling) {
+            var capturedPiece = successfulCapture ? getPiece(capturedPiecePos.x, capturedPiecePos.y, pieces) : null;
+            if (clickedPiece !== null && !successfulCapture && !move.isCastling) {
                 this.resetTurn();
                 return;
             }
@@ -340,20 +442,18 @@ class Board extends React.Component {
             if (move.isValid || successfulCapture) {
                 var newState = {
                     whitesTurn: !this.state.history[this.state.index].whitesTurn || this.state.ignoreTurns,
-                    captured: this.state.history[this.state.index].captured.slice()
+                    captured: this.state.history[this.state.index].captured.slice(),
                 };
 
                 if (successfulCapture) {
-                    newState.captured.push(board[capturedPiecePos]);
-                    board[capturedPiecePos] = null;
+                    newState.captured.push(capturedPiece);
+                    removePiece(capturedPiecePos.x, capturedPiecePos.y, pieces);
                 }
 
                 for (let i = 0; i < move.moves.length; i++) {
-                    var m = move.moves[i];
-                    board[m.end] = m.piece;
-                    board[m.start] = null;
+                    movePiece(move.moves[i].start, move.moves[i].end, pieces);
                 }
-
+/*
                 // Prepare pieces for check check
                 let whitePieces = [];
                 let whiteKing = null;
@@ -376,15 +476,18 @@ class Board extends React.Component {
                     }
                 }
 
-                if (this.isKingInCheck(whiteKing.location, blackPieces, board)) {
+                var whiteKingAttacker = whiteKing ? isKingInCheckSpecificPieces(whiteKing.location, blackPieces, board) : null;
+                var blackKingAttacker = blackKing ? isKingInCheckSpecificPieces(blackKing.location, whitePieces, board) : null;
+                if (whiteKingAttacker) {
+                    console.log(whiteKingAttacker);
                     newState.kingStatus = "White king in check!";
                 }
-
-                if (this.isKingInCheck(blackKing.location, whitePieces, board)) {
-                    newState.kingStatus = "Black king in check!";                    
+                if (blackKingAttacker) {
+                    console.log(blackKingAttacker);
+                    newState.kingStatus = "Black king in check!";
                 }
-    
-                newState.board = board;
+    */
+                newState.pieces = pieces;
 
                 var history = this.state.history.slice();
                 history.push(newState);
@@ -428,17 +531,19 @@ class Board extends React.Component {
                 </p>
                 <table>
                     <tbody>
-                    {[0, 1, 2, 3, 4, 5, 6, 7].map((x, i) => {
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((i, y) => {
                         return (
                             <tr key={i}>
-                                {[0, 1, 2, 3, 4, 5, 6, 7].map((y, j) => {
+                                {[0, 1, 2, 3, 4, 5, 6, 7].map((j, x) => {
                                     return (
                                         <Space
-                                            key={i * 8 + j}
-                                            piece={this.state.history[this.state.index].board[i * 8 + j]}
-                                            id={i * 8 + j}
-                                            isOnDeck={(i * 8 + j) === this.state.desiredStart}
-                                            onClick={() => this.handleClick(i * 8 + j)}
+                                            key={x + "," + y}
+                                            pos={x + "," + y}
+                                            piece={getPiece(x, y, this.state.history[this.state.index].pieces)}
+                                            x={x}
+                                            y={y}
+                                            isOnDeck={this.state.pieceToMove !== null && (this.state.pieceToMove.x === x && this.state.pieceToMove.y === y)}
+                                            onClick={() => this.handleClick(x, y)}
                                             />
                                     );
                                 })}
@@ -447,6 +552,14 @@ class Board extends React.Component {
                     })}
                     </tbody>
                 </table>
+                {/*<div class="pieceTray">
+                    {this.state.history[this.state.index].captured.map((piece, index) => {
+                        let type = piece.type;
+                        return (
+                            <img src={require(`../public/images/${type}.png`)} />
+                        );
+                    })}
+                </div>*/}
                 <div>{replay}</div>
                 <h3 className="subtitle">Captured Pieces</h3>
                 <ul id="capturedPieces">
@@ -467,8 +580,8 @@ class ChessGame extends React.Component {
         return (
             <div id="game">
                 <h2 className="title">Chess</h2>
-                <div className="icon-credit">Icons made by <a href="https://www.flaticon.com/authors/freepik" title="Chess Pack Author">Freepik</a>.</div>
                 <Board />
+                <div className="footer">Project by Jake Oliger. <a href="https://jakeoliger.com">Website</a>. <a href="https://github.com/JakeOliger/Chess">GitHub</a>. Icons from <a href="https://icons8.com/">Icons8</a>.</div>
             </div>
         );
     }
