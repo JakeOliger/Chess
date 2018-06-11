@@ -61,8 +61,8 @@ var regulationStartingPieces = {
     "4,1": new Pc(P, W), "5,1": new Pc(P, W), "6,1": new Pc(P, W), "7,1": new Pc(P, W),
     "0,6": new Pc(P, B), "1,6": new Pc(P, B), "2,6": new Pc(P, B), "3,6": new Pc(P, B),
     "4,6": new Pc(P, B), "5,6": new Pc(P, B), "6,6": new Pc(P, B), "7,6": new Pc(P, B),
-    "0,7": new Pc(R, B), "1,7": new Pc(KN, B), "2,7": new Pc(BI, B), "3,7": new Pc(Q, B),
-    "4,7": new Pc(KI, B), "5,7": new Pc(BI, B), "6,7": new Pc(KN, B), "7,7": new Pc(R, B),
+    "0,7": new Pc(R, B), "1,7": new Pc(KN, B), "2,7": new Pc(BI, B), "3,7": new Pc(KI, B),
+    "4,7": new Pc(Q, B), "5,7": new Pc(BI, B), "6,7": new Pc(KN, B), "7,7": new Pc(R, B),
 };
 
 var castlingTestingPieces = {
@@ -71,7 +71,7 @@ var castlingTestingPieces = {
     "0,2": new Pc(BI, W),
     "7,5": new Pc(BI, B),
     "5,6": new Pc(P, B),
-    "0,7": new Pc(R, B), "2,7": new Pc(BI, B), "4,7": new Pc(KI, B), "7,7": new Pc(R, B)
+    "0,7": new Pc(R, B), "2,7": new Pc(BI, B), "3,7": new Pc(KI, B), "7,7": new Pc(R, B)
 };
 
 /**
@@ -125,13 +125,10 @@ function isValidMove(piece, dest, pieces) {
                 break;
             }
             isValid = true;
-            function boolog(msg) { console.log(msg); return true; }
             // Check to make sure all spaces between here and the destination are clear
-            for (let l = rookMoveFunc(piece.x, piece.y); boolog(l.x !== dest.x && l.y !== dest.y) && l.x !== dest.x && l.y !== dest.y; l = rookMoveFunc(l.x, l.y)) {
-                console.log("Test");
+            for (let l = rookMoveFunc(piece.x, piece.y); l.x !== dest.x || l.y !== dest.y; l = rookMoveFunc(l.x, l.y)) {
                 if (getPiece(l.x, l.y, pieces) !== null) {
                     isValid = false;
-                    console.log("Ain't valid");
                     break;
                 }
             }
@@ -178,49 +175,48 @@ function isValidMove(piece, dest, pieces) {
             }
             isValid = true;
             // Check to make sure all spaces between here and the destination are clear
-            for (let l = queenMoveFunc(piece.x, piece.y); l.x !== dest.x && l.y !== dest.y; l = queenMoveFunc(l.x, l.y)) {
+            for (let l = queenMoveFunc(piece.x, piece.y); l.x !== dest.x || l.y !== dest.y; l = queenMoveFunc(l.x, l.y)) {
                 if (getPiece(l.x, l.y, pieces) !== null) {
                     isValid = false;
                     break;
                 }
             }
             break;
-        /*case KING:
+        case KING:
             // If the place the king is moving to is in check, don't allow it
-            var absMvmt = Math.abs(mvmt);
-            var rowEnd = rowStart + 7;
-            isValid = absMvmt === 1 || absMvmt === 7 || absMvmt === 8 || absMvmt === 9;
-            if (absMvmt === 2 && piece.isFirstMove) {
+            var absMvmt = {
+                x: Math.abs(mvmt.x),
+                y: Math.abs(mvmt.y),
+            };
+            isValid = absMvmt.x <= 1 && absMvmt.y <= 1;
+            if (absMvmt.x === 2 && absMvmt.y === 0 && piece.isFirstMove) {
                 // Attempted castling
-                var rookPosition = null;
-                if (dir > 0 && board[rowStart] !== null && board[rowStart].type === ROOK) {
-                    rookPosition = rowStart;
-                } else if (dir < 0 && board[rowEnd] !== null && board[rowEnd].type === ROOK) {
-                    rookPosition = rowEnd;
-                }
-                if (rookPosition !== null && board[rookPosition].isFirstMove) {
+                var rook = dir.x < 0 ? getPiece(0, piece.y, pieces) : getPiece(7, piece.y, pieces);
+                if (rook !== null && rook.type === ROOK && rook.isFirstMove) {
                     isCastling = true;
-                    for (let i = rookPosition + dir; i !== start; i += dir) {
-                        if (board[i] !== null) {
+                    // Ensure spaces between rook and king are empty
+                    for (let i = rook.x - dir.x; i !== piece.x; i -= dir.x) {
+                        if (getPiece(i, rook.y, pieces) !== null) {
                             isCastling = false;
                             break;
                         }
                     }
                     // Check if king is in check -- saving most complex calculation for last
-                    isCastling = !isKingInCheckWholeBoard(start, board) &&
-                        !isKingInCheckWholeBoard(start - dir, board, piece.team);
+                    isCastling = !isKingInCheckWholeBoard(piece, pieces) &&
+                        !isKingInCheckWholeBoard({x: piece.x + dir.x, y: piece.y}, pieces, piece.team);
                 }
                 if (isCastling) {
                     isValid = true;
                     moves.push({
-                        piece: board[rookPosition],
-                        start: rookPosition,
-                        end: start - dir
+                        piece: rook,
+                        start: rook,
+                        end: {x: piece.x + dir.x, y: piece.y}
                     });
                 }
             }
-            isValid = isValid && !isKingInCheckWholeBoard(end, board, piece.team);
-            break;*/
+            // Check if the final position of the king would be in check
+            isValid = isValid && !isKingInCheckWholeBoard(dest, pieces, piece.team);
+            break;
         default:
             isValid = false;
             break;
@@ -228,33 +224,36 @@ function isValidMove(piece, dest, pieces) {
     return {isValid: isValid, moves: moves, isCastling: isCastling};
 }
 
-function isKingInCheckWholeBoard(kingPosition, board, kingTeam) {
-    var king = board[kingPosition];
+/**
+ * Determines whether or not the king piece or space given is in check
+ *
+ * @param {*} king Either the king or an object with an (x, y) coordinate
+ * @param {*} pieces The game pieces object
+ * @param {*} kingTeam The team of the king, used for hypothetical king positions
+ * @returns The checking piece if found, null otherwise
+ */
+function isKingInCheckWholeBoard(king, pieces, kingTeam) {
+    if (king == null) {
+        console.error("Invalid parameter given: king is null or undefined");
+        return null;
+    }
+    let hypothetical = king.team == null;
     if (kingTeam === undefined) {
-        kingTeam = king !== null ? king.team : null;
+        kingTeam = !hypothetical ? king.team : null;
     }
-    for (let i = 0; i < board.length; i++) {
-        if (board[i] === null || i === kingPosition) continue;
-        let kingExists_isOnTeam =
-            king !== null && board[i].team === king.team;
-        let kingHypothetical_isOnTeam =
-            kingTeam !== null && board[i].team === kingTeam;
-        if (kingExists_isOnTeam || kingHypothetical_isOnTeam) {
-            continue;
-        }
-        let move = isValidMove(i, kingPosition, board);
-        let capture = isValidCapture(move.isValid, i, kingPosition, board, king === null);
-        if (capture) return {location: i, piece: board[i]};
+    if (kingTeam == null) {
+        console.error("King team could not be determined");
+        return null;
     }
-}
-
-function isKingInCheckSpecificPieces(kingPosition, pieces, board) {
-    var king = board[kingPosition];
-    for (let i = 0; i < pieces.length; i++) {
-        let move = isValidMove(pieces[i].location, kingPosition, board);
-        if (isValidCapture(move.isValid, pieces[i].location, kingPosition, board, king === null)) {
-            return pieces[i];
+    for (let coord in pieces) {
+        if (pieces.hasOwnProperty(coord)) {
+            let pieceIsKing = pieces[coord].x === king.x && pieces[coord].y === king.y;
+            if (pieces[coord] === null || pieceIsKing) continue;
+            if (kingTeam === pieces[coord].team) continue;
         }
+        let move = isValidMove(pieces[coord], king, pieces);
+        let capture = isValidCapture(move.isValid, pieces[coord], king, pieces, hypothetical);
+        if (capture) return pieces[coord];
     }
 }
 
@@ -313,27 +312,67 @@ function isValidCapture(validMove, captor, captivePos, pieces, hypothetical) {
     return (isValid ? captivePos : null);
 }
 
+/**
+ * Returns the piece on the board at the given (x, y) coordinate for the given
+ * pieces, or null if not found. The piece will also be assigned an x and y
+ * property so that it "knows" where it is on the board.
+ *
+ * @param {*} x The X coordinate
+ * @param {*} y The Y coordinate
+ * @param {*} pieces The object specifying game pieces and locations, each key
+ *                   being in the form of "x,y"
+ * @returns The piece if found, null otherwise
+ */
 function getPiece(x, y, pieces) {
+    // Invalid arguments
     if (isNaN(x) || isNaN(y) || !pieces) return null;
+    // Off the board
+    if (x < 0 || x > 7 || y < 0 || y > 7) return null;
+
+    // Try to find the piece
     let key = x + "," + y;
     if (pieces.hasOwnProperty(key)) {
         return Object.assign(pieces[key], {x: x, y: y});
     }
+
     return null;
 }
-
+ 
+/**
+ * Removes the piece at the specified (x, y) coordinate from the given
+ * pieces.
+ *
+ * @param {*} x The X coordinate
+ * @param {*} y The Y coordinate
+ * @param {*} pieces The object specifying game pieces and locations, each key
+ *                   being in the form of "x,y"
+ * @returns The piece if found and removed, null otherwise
+ */
 function removePiece(x, y, pieces) {
-    if (isNaN(x) || isNaN(y) || !pieces) return;
+    // Invalid arguments
+    if (isNaN(x) || isNaN(y) || !pieces) return null;
+    // Off the board
+    if (x < 0 || x > 7 || y < 0 || y > 7) return null;
+
     let key = x + "," + y;
     let piece = pieces[key];
     delete pieces[key];
     return piece;
 }
 
+/**
+ * Moves the piece from start to end
+ *
+ * @param {*} start An object specifying the start position with x and y properties
+ * @param {*} end An object specifying the end position with x and y properties
+ * @param {*} pieces The object specifying game pieces and locations, each key
+ *                   being in the form of "x,y"
+ * @returns True if piece successfully removed, false otherwise
+ */
 function movePiece(start, end, pieces) {
     if (getPiece(end.x, end.y, pieces)) {
         console.error("Tried moving a piece to an occupied space!");
-        return;
+        return false;
     }
     let piece = removePiece(start.x, start.y, pieces);
     if (Math.abs(start.y - end.y) === 2 && piece.type === PAWN) {
@@ -341,6 +380,7 @@ function movePiece(start, end, pieces) {
     }
     piece.isFirstMove = false;
     pieces[end.x + "," + end.y] = piece;
+    return true;
 }
 
 class Space extends React.Component {
@@ -372,7 +412,7 @@ class Board extends React.Component {
         super(props);
         this.state = {
             history: [{
-                pieces: regulationStartingPieces,
+                pieces: castlingTestingPieces,
                 captured: [],
                 whitesTurn: true,
                 kingStatus: "",
