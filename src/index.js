@@ -4,6 +4,18 @@ import './index.css';
 
 /* INTERNAL TODO
  * - Add dialog for promotion
+ * - Add win conditions
+ * - Disallow moves that don't save the king from being in check
+ * - Add captured piece icons to trays rather than listing them below the board
+ * - Improve UI for moving pieces (e.g. allow dragging)
+ * - Show where pieces can move, as an option
+ * - Make board resizable
+ * 
+ * Known bugs:
+ * - Pawn en passant capturing code seems to give false positives, though
+ *   doesn't follow through on moves?
+ * - Castling seems to be disallowed at times it should be allowed, though
+ *   this problem is inconsistent and hard to reproduce.
  */
 
 class Pc {
@@ -75,9 +87,9 @@ var castlingTestingPieces = {
  * @param {*} piece The start piece, with x and y specified as properties
  * @param {*} dest The end position of the move, with x and y specified as properties
  * @param {*} board The array of piece positions on the board
- * @returns
+ * @returns An object detailing the move and whether or not it is valid
  */
-function isValidMove(piece, dest, pieces) {
+function isValidMove(piece, dest, pieces, whiteKing, blackKing) {
     var isValid = false;
     var mvmt = {
         x: dest.x - piece.x,
@@ -93,6 +105,16 @@ function isValidMove(piece, dest, pieces) {
         end: dest
     }];
     var isCastling = false;
+
+    // Ensure non-king piece cannot be moved if king is in check
+    /*
+    if (piece.type !== KING &&
+        ((piece.team === WHITE && isKingInCheck(whiteKing, pieces)) ||
+        ((piece.team === BLACK && isKingInCheck(blackKing, pieces))))) {
+        return {isValid: false, moves: moves, isCastling: false};
+    }
+    */
+
     switch (piece.type) {
         case PAWN:
             if (mvmt.x !== 0) {
@@ -216,6 +238,10 @@ function isValidMove(piece, dest, pieces) {
             isValid = false;
             break;
     }
+    // DEBUG
+    if (piece.type === PAWN) {
+        console.debug("Move is " + (isValid ? "valid" : "invalid"));
+    }
     return {isValid: isValid, moves: moves, isCastling: isCastling};
 }
 
@@ -239,6 +265,10 @@ function isValidCapture(validMove, captor, captivePos, pieces, hypothetical) {
         captive = {team: (captor.team === WHITE ? BLACK : WHITE), justDoubleMoved: false};
     } else if (captor.type === PAWN && captive === null) {
         // En passant capturing detection
+        console.log("enPassant!");
+        console.log(captivePos);
+        console.log(captor);
+        console.log("endPassant.");
         enPassant = true;
         captivePos.y += (captor.team === WHITE ? -1 : 1);
         captive = getPiece(captivePos.x, captivePos.y, pieces);
@@ -270,6 +300,10 @@ function isValidCapture(validMove, captor, captivePos, pieces, hypothetical) {
         default:
             isValid = false;
             break;
+    }
+    // DEBUG
+    if (captor.type === PAWN) {
+        console.debug("Capture is " + (isValid ? "valid" : "invalid"));
     }
     return (isValid ? captivePos : null);
 }
@@ -447,6 +481,7 @@ class Board extends React.Component {
             pieceToMove: null,
             ignoreTurns: false,
             isReplaying: false,
+            stopReplaying: false,
             showCoords: false,
         };
     }
@@ -469,6 +504,7 @@ class Board extends React.Component {
                 this.setState({
                     pieceToMove: clickedPiece,
                 });
+                console.debug(clickedPiece);
             }
         } else {
             var move = isValidMove(pieceToMove, {x: x, y: y}, pieces);
@@ -524,9 +560,14 @@ class Board extends React.Component {
 
                     if (whiteKingAttacker) {
                         history[this.state.index].kingStatus = "White king in check!";
-                    }
-                    if (blackKingAttacker) {
+                        console.debug("Piece putting white king in check:");
+                        console.debug(whiteKingAttacker)
+                    } else if (blackKingAttacker) {
                         history[this.state.index].kingStatus = "Black king in check!";
+                        console.debug("Piece putting black king in check:");
+                        console.debug(blackKingAttacker)
+                    } else {
+                        history[this.state.index].kingStatus = "";
                     }
 
                     history[this.state.index].pieces = pieces;
@@ -544,20 +585,40 @@ class Board extends React.Component {
     render() {
         let replay =
             <button className="replay" onClick={() => {
-                if (this.state.isReplaying) return;
+                if (this.state.isReplaying) {
+                    this.setState({
+                        stopReplaying: true,
+                        index: this.state.history.length - 1,
+                    });
+                } else {
+                    var i = 0;
+                    var intervalId = setInterval(() => {
+                        if (this.state.stopReplaying) {
+                            clearInterval(intervalId);
+                            this.setState({
+                                stopReplaying: false,
+                                isReplaying: false,
+                            });
+                        } else {
+                            this.jumpTo(i);
+                            i++;
+                            if (i >= this.state.history.length) {
+                                clearInterval(intervalId);
+                                this.setState({
+                                    isReplaying: false,
+                                    stopReplaying: false,
+                                });
+                            }
+                        }
+                    }, 500);
+                    this.setState({
+                        isReplaying: true,
+                        stopReplaying: false,
+                    });
+                }
 
-                this.setState({isReplaying: true});
-                var i = 0;
-                var intervalId = setInterval(() => {
-                    this.jumpTo(i);
-                    i++;
-                    if (i >= this.state.history.length) {
-                        this.setState({isReplaying: false});
-                        clearInterval(intervalId);
-                    }
-                }, 500);
             }}>
-                {this.state.isReplaying ? "Replaying..." : "Instant Replay"}
+                {this.state.isReplaying ? "Stop Replay" : "Instant Replay"}
             </button>;
 
         return (
