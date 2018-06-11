@@ -3,11 +3,6 @@ import ReactDOM from 'react-dom';
 import './index.css';
 
 /* INTERNAL TODO
- * - Replace board representation with an array of only pieces and positions
- *      Pros: Easier to iterate through pieces
- *      Cons: Potentially more difficult to check if a space is occupied
- * - Enforce check rules
- *      - Determine why castling check check is not working
  * - Add dialog for promotion
  */
 
@@ -383,6 +378,30 @@ function movePiece(start, end, pieces) {
     return true;
 }
 
+/**
+ * Find and returns the two kings
+ *
+ * @param {*} pieces The game pieces object
+ * @returns The white and black kings in an object with properties whiteKing and blackKing
+ */
+function getKings(pieces) {
+    let whiteKing = null;
+    let blackKing = null;
+    for (let coord in pieces) {
+        if (whiteKing !== null && blackKing !== null) break;
+        if (pieces.hasOwnProperty(coord) && pieces[coord] !== null) {
+            if (pieces[coord].type === KING) {
+                if (pieces[coord].team === WHITE) {
+                    whiteKing = pieces[coord];
+                } else {
+                    blackKing = pieces[coord];
+                }
+            }
+        }
+    }
+    return {whiteKing: whiteKing, blackKing: blackKing};
+}
+
 class Space extends React.Component {
     render() {
         if (!this.props.piece) {
@@ -410,9 +429,15 @@ class Space extends React.Component {
 class Board extends React.Component {
     constructor(props) {
         super(props);
+
+        let pieces = regulationStartingPieces;
+        let {whiteKing, blackKing} = getKings(pieces);
+
         this.state = {
             history: [{
-                pieces: regulationStartingPieces,
+                pieces: pieces,
+                whiteKing: whiteKing,
+                blackKing: blackKing,
                 captured: [],
                 whitesTurn: true,
                 kingStatus: "",
@@ -458,6 +483,8 @@ class Board extends React.Component {
                 var newState = {
                     whitesTurn: !this.state.history[this.state.index].whitesTurn || this.state.ignoreTurns,
                     captured: this.state.history[this.state.index].captured.slice(),
+                    whiteKing: JSON.parse(JSON.stringify(this.state.history[this.state.index].whiteKing)),
+                    blackKing: JSON.parse(JSON.stringify(this.state.history[this.state.index].blackKing)),
                 };
 
                 if (successfulCapture) {
@@ -466,24 +493,19 @@ class Board extends React.Component {
                 }
 
                 for (let i = 0; i < move.moves.length; i++) {
+                    if (move.moves[i].piece.type === KING) {
+                        if (move.moves[i].piece.team === WHITE) {
+                            newState.whiteKing = JSON.parse(JSON.stringify(move.moves[i].piece));
+                        } else {
+                            newState.blackKing = JSON.parse(JSON.stringify(move.moves[i].piece));
+                        }
+                    }
                     movePiece(move.moves[i].start, move.moves[i].end, pieces);
                 }
 
-                // Prepare pieces for check check
-                let whiteKing = null;
-                let blackKing = null;
-                for (let coord in pieces) {
-                    if (whiteKing !== null && blackKing !== null) break;
-                    if (pieces.hasOwnProperty(coord) && pieces[coord] !== null) {
-                        if (pieces[coord].type === KING) {
-                            if (pieces[coord].team === WHITE) {
-                                whiteKing = pieces[coord];
-                            } else {
-                                blackKing = pieces[coord];
-                            }
-                        }
-                    }
-                }
+                // Check whether or not the king is in check
+                let whiteKing = newState.whiteKing;
+                let blackKing = newState.blackKing;
 
                 var whiteKingAttacker = whiteKing ? isKingInCheck(whiteKing, pieces) : null;
                 var blackKingAttacker = blackKing ? isKingInCheck(blackKing, pieces) : null;
