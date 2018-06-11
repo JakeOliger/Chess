@@ -300,11 +300,12 @@ function isKingInCheck(king, pieces, kingTeam) {
             let pieceIsKing = pieces[coord].x === king.x && pieces[coord].y === king.y;
             if (pieces[coord] === null || pieceIsKing) continue;
             if (kingTeam === pieces[coord].team) continue;
+            let move = isValidMove(pieces[coord], king, pieces);
+            let capture = isValidCapture(move.isValid, pieces[coord], king, pieces, hypothetical);
+            if (capture) return pieces[coord];
         }
-        let move = isValidMove(pieces[coord], king, pieces);
-        let capture = isValidCapture(move.isValid, pieces[coord], king, pieces, hypothetical);
-        if (capture) return pieces[coord];
     }
+    return null;
 }
 
 /**
@@ -502,21 +503,6 @@ class Board extends React.Component {
                     }
                     movePiece(move.moves[i].start, move.moves[i].end, pieces);
                 }
-
-                // Check whether or not the king is in check
-                let whiteKing = newState.whiteKing;
-                let blackKing = newState.blackKing;
-
-                var whiteKingAttacker = whiteKing ? isKingInCheck(whiteKing, pieces) : null;
-                var blackKingAttacker = blackKing ? isKingInCheck(blackKing, pieces) : null;
-                if (whiteKingAttacker) {
-                    console.log(whiteKingAttacker);
-                    newState.kingStatus = "White king in check!";
-                }
-                if (blackKingAttacker) {
-                    console.log(blackKingAttacker);
-                    newState.kingStatus = "Black king in check!";
-                }
     
                 newState.pieces = pieces;
 
@@ -525,6 +511,26 @@ class Board extends React.Component {
                 this.setState({
                     history: history,
                     index: this.state.index + 1,
+                }, () => {
+                    // Check whether or not the king is in check
+                    let history = this.state.history.slice();
+                    let pieces = JSON.parse(JSON.stringify(history[this.state.index].pieces));
+
+                    let whiteKing = history[this.state.index].whiteKing;
+                    let blackKing = history[this.state.index].blackKing;
+
+                    let whiteKingAttacker = whiteKing ? isKingInCheck(whiteKing, pieces) : null;
+                    let blackKingAttacker = blackKing ? isKingInCheck(blackKing, pieces) : null;
+
+                    if (whiteKingAttacker) {
+                        history[this.state.index].kingStatus = "White king in check!";
+                    }
+                    if (blackKingAttacker) {
+                        history[this.state.index].kingStatus = "Black king in check!";
+                    }
+
+                    history[this.state.index].pieces = pieces;
+                    this.setState({history: history});
                 });
             }
             this.resetTurn();
