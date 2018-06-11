@@ -202,8 +202,8 @@ function isValidMove(piece, dest, pieces) {
                         }
                     }
                     // Check if king is in check -- saving most complex calculation for last
-                    isCastling = !isKingInCheckWholeBoard(piece, pieces) &&
-                        !isKingInCheckWholeBoard({x: piece.x + dir.x, y: piece.y}, pieces, piece.team);
+                    isCastling = !isKingInCheck(piece, pieces) &&
+                        !isKingInCheck({x: piece.x + dir.x, y: piece.y}, pieces, piece.team);
                 }
                 if (isCastling) {
                     isValid = true;
@@ -215,46 +215,13 @@ function isValidMove(piece, dest, pieces) {
                 }
             }
             // Check if the final position of the king would be in check
-            isValid = isValid && !isKingInCheckWholeBoard(dest, pieces, piece.team);
+            isValid = isValid && !isKingInCheck(dest, pieces, piece.team);
             break;
         default:
             isValid = false;
             break;
     }
     return {isValid: isValid, moves: moves, isCastling: isCastling};
-}
-
-/**
- * Determines whether or not the king piece or space given is in check
- *
- * @param {*} king Either the king or an object with an (x, y) coordinate
- * @param {*} pieces The game pieces object
- * @param {*} kingTeam The team of the king, used for hypothetical king positions
- * @returns The checking piece if found, null otherwise
- */
-function isKingInCheckWholeBoard(king, pieces, kingTeam) {
-    if (king == null) {
-        console.error("Invalid parameter given: king is null or undefined");
-        return null;
-    }
-    let hypothetical = king.team == null;
-    if (kingTeam === undefined) {
-        kingTeam = !hypothetical ? king.team : null;
-    }
-    if (kingTeam == null) {
-        console.error("King team could not be determined");
-        return null;
-    }
-    for (let coord in pieces) {
-        if (pieces.hasOwnProperty(coord)) {
-            let pieceIsKing = pieces[coord].x === king.x && pieces[coord].y === king.y;
-            if (pieces[coord] === null || pieceIsKing) continue;
-            if (kingTeam === pieces[coord].team) continue;
-        }
-        let move = isValidMove(pieces[coord], king, pieces);
-        let capture = isValidCapture(move.isValid, pieces[coord], king, pieces, hypothetical);
-        if (capture) return pieces[coord];
-    }
 }
 
 /**
@@ -310,6 +277,39 @@ function isValidCapture(validMove, captor, captivePos, pieces, hypothetical) {
             break;
     }
     return (isValid ? captivePos : null);
+}
+
+/**
+ * Determines whether or not the king piece or space given is in check
+ *
+ * @param {*} king Either the king or an object with an (x, y) coordinate
+ * @param {*} pieces The game pieces object
+ * @param {*} kingTeam The team of the king, used for hypothetical king positions
+ * @returns The checking piece if found, null otherwise
+ */
+function isKingInCheck(king, pieces, kingTeam) {
+    if (king == null) {
+        console.error("Invalid parameter given: king is null or undefined");
+        return null;
+    }
+    let hypothetical = king.team == null;
+    if (kingTeam === undefined) {
+        kingTeam = !hypothetical ? king.team : null;
+    }
+    if (kingTeam == null) {
+        console.error("King team could not be determined");
+        return null;
+    }
+    for (let coord in pieces) {
+        if (pieces.hasOwnProperty(coord)) {
+            let pieceIsKing = pieces[coord].x === king.x && pieces[coord].y === king.y;
+            if (pieces[coord] === null || pieceIsKing) continue;
+            if (kingTeam === pieces[coord].team) continue;
+        }
+        let move = isValidMove(pieces[coord], king, pieces);
+        let capture = isValidCapture(move.isValid, pieces[coord], king, pieces, hypothetical);
+        if (capture) return pieces[coord];
+    }
 }
 
 /**
@@ -412,7 +412,7 @@ class Board extends React.Component {
         super(props);
         this.state = {
             history: [{
-                pieces: castlingTestingPieces,
+                pieces: regulationStartingPieces,
                 captured: [],
                 whitesTurn: true,
                 kingStatus: "",
@@ -468,31 +468,25 @@ class Board extends React.Component {
                 for (let i = 0; i < move.moves.length; i++) {
                     movePiece(move.moves[i].start, move.moves[i].end, pieces);
                 }
-/*
+
                 // Prepare pieces for check check
-                let whitePieces = [];
                 let whiteKing = null;
-                let blackPieces = [];
                 let blackKing = null;
-                for (let i = 0; i < board.length; i++) {
-                    if (board[i] === null) continue;
-                    if (board[i].team === WHITE) {
-                        if (board[i].type === KING) {
-                            whiteKing = {location: i, piece: board[i]};
-                        } else {
-                            whitePieces.push({location: i, piece: board[i]});
-                        }
-                    } else {
-                        if (board[i].type === KING) {
-                            blackKing = {location: i, piece: board[i]};
-                        } else {
-                            blackPieces.push({location: i, piece: board[i]});
+                for (let coord in pieces) {
+                    if (whiteKing !== null && blackKing !== null) break;
+                    if (pieces.hasOwnProperty(coord) && pieces[coord] !== null) {
+                        if (pieces[coord].type === KING) {
+                            if (pieces[coord].team === WHITE) {
+                                whiteKing = pieces[coord];
+                            } else {
+                                blackKing = pieces[coord];
+                            }
                         }
                     }
                 }
 
-                var whiteKingAttacker = whiteKing ? isKingInCheckSpecificPieces(whiteKing.location, blackPieces, board) : null;
-                var blackKingAttacker = blackKing ? isKingInCheckSpecificPieces(blackKing.location, whitePieces, board) : null;
+                var whiteKingAttacker = whiteKing ? isKingInCheck(whiteKing, pieces) : null;
+                var blackKingAttacker = blackKing ? isKingInCheck(blackKing, pieces) : null;
                 if (whiteKingAttacker) {
                     console.log(whiteKingAttacker);
                     newState.kingStatus = "White king in check!";
@@ -501,7 +495,7 @@ class Board extends React.Component {
                     console.log(blackKingAttacker);
                     newState.kingStatus = "Black king in check!";
                 }
-    */
+    
                 newState.pieces = pieces;
 
                 var history = this.state.history.slice();
