@@ -60,6 +60,13 @@ body {
   border-color: #86beff;
 }
 
+#game table tr td.highlight,
+#game tr:nth-child(odd) td:nth-child(even).highlight,
+#game tr:nth-child(even) td:nth-child(odd).highlight {
+  border-color: #ff86e1;
+  filter: hue-rotate(-10deg);
+}
+
 #game td img {
   width: 50px;
   height: 50px;

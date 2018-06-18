@@ -12,8 +12,6 @@ import './index.css';
  * - Make board resizable
  * 
  * Known bugs:
- * - Pawn en passant capturing code seems to give false positives, though
- *   doesn't follow through on moves?
  * - Castling seems to be disallowed at times it should be allowed, though
  *   this problem is inconsistent and hard to reproduce.
  */
@@ -22,7 +20,7 @@ class Pc {
     constructor(type, team, x, y) {
         this.type = type;
         this.team = team;
-        this.isFirstMove = true;
+        this.hasMoved = false;
         this.justDoubleMoved = false;
         if (x !== undefined) this.x = x;
         if (y !== undefined) this.y = y;
@@ -89,7 +87,12 @@ var castlingTestingPieces = {
  * @param {*} board The array of piece positions on the board
  * @returns An object detailing the move and whether or not it is valid
  */
-function isValidMove(piece, dest, pieces, whiteKing, blackKing) {
+function isValidMove(piece, dest, pieces) {
+    var destPiece = getPiece(dest.x, dest.y, pieces);
+    if (destPiece && destPiece.team === piece.team) {
+        return {isValid: false, moves: [], isCastling: false, capturedPiece: null};
+    }
+    var capturedPiece = null;
     var isValid = false;
     var mvmt = {
         x: dest.x - piece.x,
@@ -106,29 +109,35 @@ function isValidMove(piece, dest, pieces, whiteKing, blackKing) {
     }];
     var isCastling = false;
 
-    // Ensure non-king piece cannot be moved if king is in check
-    /*
-    if (piece.type !== KING &&
-        ((piece.team === WHITE && isKingInCheck(whiteKing, pieces)) ||
-        ((piece.team === BLACK && isKingInCheck(blackKing, pieces))))) {
-        return {isValid: false, moves: moves, isCastling: false};
-    }
-    */
-
     switch (piece.type) {
         case PAWN:
-            if (mvmt.x !== 0) {
-                isValid = false;
-                break;
-            }
-            var maxMvmt = piece.team === WHITE ? 1 : -1;
-            isValid = Math.abs(mvmt.y) <= 2 && (piece.team === WHITE ? mvmt.y > 0 : mvmt.y < 0);
-            if (isValid) {
-                if (piece.isFirstMove) {
-                    isValid = getPiece(piece.x, piece.y + maxMvmt, pieces) === null;
-                    maxMvmt *= 2;
+            // Verify we're moving in the right direction
+            if (piece.team === WHITE ? mvmt.y < 0 : mvmt.y > 0) break;
+            if (Math.abs(mvmt.x) === 1 && Math.abs(mvmt.y) === 1) {
+                // Attempted capture
+                if (!destPiece) {
+                    // En passant
+                    destPiece = getPiece(dest.x, dest.y - mvmt.y, pieces);
+                    if (!destPiece ||
+                        destPiece.team === piece.team ||
+                        !destPiece.justDoubleMoved) {
+                        break;
+                    }
                 }
-                isValid = isValid && (piece.team === WHITE ? mvmt.y <= maxMvmt : mvmt.y >= maxMvmt);
+                capturedPiece = destPiece;
+                isValid = true;
+            } else if (mvmt.x === 0) {
+                var maxMvmt = piece.team === WHITE ? 1 : -1;
+                isValid = Math.abs(mvmt.y) <= 2 && (piece.team === WHITE ? mvmt.y > 0 : mvmt.y < 0);
+                if (isValid) {
+                    if (!piece.hasMoved) {
+                        isValid = getPiece(piece.x, piece.y + maxMvmt, pieces) === null;
+                        maxMvmt *= 2;
+                    }
+                    isValid = isValid &&
+                        (piece.team === WHITE ? mvmt.y <= maxMvmt : mvmt.y >= maxMvmt) &&
+                        !destPiece;
+                }
             }
             break;
         case ROOK:
@@ -206,10 +215,10 @@ function isValidMove(piece, dest, pieces, whiteKing, blackKing) {
                 y: Math.abs(mvmt.y),
             };
             isValid = absMvmt.x <= 1 && absMvmt.y <= 1;
-            if (absMvmt.x === 2 && absMvmt.y === 0 && piece.isFirstMove) {
+            if (absMvmt.x === 2 && absMvmt.y === 0 && !piece.hasMoved) {
                 // Attempted castling
                 var rook = dir.x < 0 ? getPiece(0, piece.y, pieces) : getPiece(7, piece.y, pieces);
-                if (rook !== null && rook.type === ROOK && rook.isFirstMove) {
+                if (rook !== null && rook.type === ROOK && !rook.hasMoved) {
                     isCastling = true;
                     // Ensure spaces between rook and king are empty
                     for (let i = rook.x - dir.x; i !== piece.x; i -= dir.x) {
@@ -238,74 +247,33 @@ function isValidMove(piece, dest, pieces, whiteKing, blackKing) {
             isValid = false;
             break;
     }
-    // DEBUG
-    if (piece.type === PAWN) {
-        console.debug("Move is " + (isValid ? "valid" : "invalid"));
-    }
-    return {isValid: isValid, moves: moves, isCastling: isCastling};
-}
 
-/**
- * Determines whether a given move results in a valid vapture
- *
- * @param {*} validMove Whether the move is valid
- * @param {*} captor The starting position of the move
- * @param {*} captive The end position of the move
- * @param {*} pieces The array of pieces on the board
- * @returns The captured piece, if there is one
- */
-function isValidCapture(validMove, captor, captivePos, pieces, hypothetical) {
-    hypothetical = hypothetical || false;
-    var captive = getPiece(captivePos.x, captivePos.y, pieces);
-    var dest = {x: captivePos.x, y: captivePos.y};
-    var enPassant = false;
-    var isValid = false;
-    var mvmt;
-    if (hypothetical) {
-        captive = {team: (captor.team === WHITE ? BLACK : WHITE), justDoubleMoved: false};
-    } else if (captor.type === PAWN && captive === null) {
-        // En passant capturing detection
-        console.log("enPassant!");
-        console.log(captivePos);
-        console.log(captor);
-        console.log("endPassant.");
-        enPassant = true;
-        captivePos.y += (captor.team === WHITE ? -1 : 1);
-        captive = getPiece(captivePos.x, captivePos.y, pieces);
+    // Ensure king would not be in check if move is followed through on
+   if (isValid && (!destPiece || (destPiece && destPiece.type !== KING))) {
+        let piecesCopy = JSON.parse(JSON.stringify(pieces));
+        if (destPiece) {
+            removePiece(destPiece.x, destPiece.y, piecesCopy);
+        }
+        movePiece(piece, dest, piecesCopy);
+        let king;
+        if (piece.team === WHITE) {
+            king = piecesCopy.whiteKing;
+        } else {
+            king = piecesCopy.blackKing;
+        }
+        isValid = isValid && !isKingInCheck(king, piecesCopy);
     }
-    if (captor === null || captive === null) return null;
-    mvmt = {
-        x: dest.x - captor.x,
-        y: dest.y - captor.y,
+
+    if (isValid && !capturedPiece && destPiece) {
+        capturedPiece = destPiece;
+    }
+    
+    return {
+        isValid: isValid,
+        moves: moves,
+        isCastling: isCastling,
+        capturedPiece: capturedPiece
     };
-    if (captor.team === captive.team) return null;
-    switch (captor.type) {
-        case PAWN:
-            if (validMove ||
-                (captor.team === B && mvmt.y > 0) ||
-                (captor.team === W && mvmt.y < 0) ||
-                (enPassant && !captive.justDoubleMoved)) {
-                isValid = false;
-                break;
-            }
-            isValid = (Math.abs(mvmt.x) === 1 && Math.abs(mvmt.y) === 1) || enPassant;
-            break;
-        case ROOK:
-        case KNIGHT:
-        case BISHOP:
-        case QUEEN:
-        case KING:
-            isValid = validMove;
-            break;
-        default:
-            isValid = false;
-            break;
-    }
-    // DEBUG
-    if (captor.type === PAWN) {
-        console.debug("Capture is " + (isValid ? "valid" : "invalid"));
-    }
-    return (isValid ? captivePos : null);
 }
 
 /**
@@ -330,13 +298,12 @@ function isKingInCheck(king, pieces, kingTeam) {
         return null;
     }
     for (let coord in pieces) {
-        if (pieces.hasOwnProperty(coord)) {
+        if (!["whiteKing", "blackKing", "lastMoved"].includes(coord) && pieces.hasOwnProperty(coord)) {
             let pieceIsKing = pieces[coord].x === king.x && pieces[coord].y === king.y;
             if (pieces[coord] === null || pieceIsKing) continue;
             if (kingTeam === pieces[coord].team) continue;
             let move = isValidMove(pieces[coord], king, pieces);
-            let capture = isValidCapture(move.isValid, pieces[coord], king, pieces, hypothetical);
-            if (capture) return pieces[coord];
+            if (move.capturedPiece) return pieces[coord];
         }
     }
     return null;
@@ -391,7 +358,7 @@ function removePiece(x, y, pieces) {
 }
 
 /**
- * Moves the piece from start to end
+ * Moves the piece from start to end and updates its self-coordinates
  *
  * @param {*} start An object specifying the start position with x and y properties
  * @param {*} end An object specifying the end position with x and y properties
@@ -405,11 +372,25 @@ function movePiece(start, end, pieces) {
         return false;
     }
     let piece = removePiece(start.x, start.y, pieces);
+    let pieceId = end.x + "," + end.y;
     if (Math.abs(start.y - end.y) === 2 && piece.type === PAWN) {
         piece.justDoubleMoved = true;
     }
-    piece.isFirstMove = false;
-    pieces[end.x + "," + end.y] = piece;
+    piece.hasMoved = true;
+    piece.x = end.x;
+    piece.y = end.y;
+    if (piece.type === KING) {
+        if (piece.team === WHITE) {
+            pieces.whiteKing = piece;
+        } else {
+            pieces.blackKing = piece;
+        }
+    }
+    pieces[pieceId] = piece;
+    if (pieces.lastMoved && pieces.hasOwnProperty(pieces.lastMoved)) {
+        pieces[pieces.lastMoved].justDoubleMoved = false;
+    }
+    pieces.lastMoved = pieceId;
     return true;
 }
 
@@ -439,24 +420,30 @@ function getKings(pieces) {
 
 class Space extends React.Component {
     render() {
-        if (!this.props.piece) {
-            return (<td onClick={this.props.onClick}></td>);
+        let classes = [];
+        if (this.props.highlight === true) {
+            classes.push("highlight");
         }
-        
-        var type = this.props.piece.type !== null ? PIECE_NAME_LC[this.props.piece.type] : "";
-        var team = this.props.piece.team !== null ? TEAM_NAME_LC[this.props.piece.team] : "";
-        var className = team;
-        var coords = this.props.showCoords ? <span className="spotId">{this.props.pos}</span> : null;
-        var img = null;
 
-        if (type !== "" && team !== "") {
-            img = <img src={require(`../public/images/${type}.png`)} alt={`${type}`} />;
-            className += (className.length > 0 ? " " : "") + "occupied";
-            className += this.props.isOnDeck ? " on-deck" : "";
+        if (this.props.piece) {
+            var type = this.props.piece.type !== null ? PIECE_NAME_LC[this.props.piece.type] : "";
+            var team = this.props.piece.team !== null ? TEAM_NAME_LC[this.props.piece.team] : "";
+            var coords = this.props.showCoords ? <span className="spotId">{this.props.pos}</span> : null;
+            var img = null;
+            
+            classes.push(team);
+
+            if (type !== "" && team !== "") {
+                img = <img src={require(`../public/images/${type}.png`)} alt={`${type}`} />;
+                classes.push("occupied");
+                if (this.props.isOnDeck) {
+                    classes.push("on-deck");
+                }
+            }
         }
         
         return (
-            <td className={className} onClick={this.props.onClick}>{coords}{img}</td>
+            <td className={classes.join(" ")} onClick={this.props.onClick}>{coords}{img}</td>
         );
     }
 }
@@ -466,13 +453,15 @@ class Board extends React.Component {
         super(props);
 
         let pieces = regulationStartingPieces;
+        // Locate the kings for easier calculations later on
         let {whiteKing, blackKing} = getKings(pieces);
+        pieces.whiteKing = whiteKing;
+        pieces.blackKing = blackKing;
+        pieces.lastMoved = null;
 
         this.state = {
             history: [{
                 pieces: pieces,
-                whiteKing: whiteKing,
-                blackKing: blackKing,
                 captured: [],
                 whitesTurn: true,
                 kingStatus: "",
@@ -504,43 +493,30 @@ class Board extends React.Component {
                 this.setState({
                     pieceToMove: clickedPiece,
                 });
-                console.debug(clickedPiece);
             }
         } else {
             var move = isValidMove(pieceToMove, {x: x, y: y}, pieces);
-            var capturedPiecePos = isValidCapture(move.isValid, pieceToMove, {x: x, y: y}, pieces);
-            var successfulCapture = capturedPiecePos !== null;
-            var capturedPiece = successfulCapture ? getPiece(capturedPiecePos.x, capturedPiecePos.y, pieces) : null;
-            if (clickedPiece !== null && !successfulCapture && !move.isCastling) {
+            if (clickedPiece !== null && !move.capturedPiece && !move.isCastling) {
                 this.resetTurn();
                 return;
             }
 
-            if (move.isValid || successfulCapture) {
+            if (move.isValid) {
                 var newState = {
                     whitesTurn: !this.state.history[this.state.index].whitesTurn || this.state.ignoreTurns,
                     captured: this.state.history[this.state.index].captured.slice(),
-                    whiteKing: JSON.parse(JSON.stringify(this.state.history[this.state.index].whiteKing)),
-                    blackKing: JSON.parse(JSON.stringify(this.state.history[this.state.index].blackKing)),
                 };
 
-                if (successfulCapture) {
-                    newState.captured.push(capturedPiece);
-                    removePiece(capturedPiecePos.x, capturedPiecePos.y, pieces);
+                if (move.capturedPiece) {
+                    newState.captured.push(move.capturedPiece);
+                    removePiece(move.capturedPiece.x, move.capturedPiece.y, pieces);
                 }
 
                 for (let i = 0; i < move.moves.length; i++) {
-                    if (move.moves[i].piece.type === KING) {
-                        if (move.moves[i].piece.team === WHITE) {
-                            newState.whiteKing = JSON.parse(JSON.stringify(move.moves[i].piece));
-                        } else {
-                            newState.blackKing = JSON.parse(JSON.stringify(move.moves[i].piece));
-                        }
-                    }
                     movePiece(move.moves[i].start, move.moves[i].end, pieces);
                 }
     
-                newState.pieces = pieces;
+                newState.pieces = JSON.parse(JSON.stringify(pieces));
 
                 var history = this.state.history.slice();
                 history.push(newState);
@@ -552,20 +528,16 @@ class Board extends React.Component {
                     let history = this.state.history.slice();
                     let pieces = JSON.parse(JSON.stringify(history[this.state.index].pieces));
 
-                    let whiteKing = history[this.state.index].whiteKing;
-                    let blackKing = history[this.state.index].blackKing;
+                    let whiteKing = pieces.whiteKing;
+                    let blackKing = pieces.blackKing;
 
                     let whiteKingAttacker = whiteKing ? isKingInCheck(whiteKing, pieces) : null;
                     let blackKingAttacker = blackKing ? isKingInCheck(blackKing, pieces) : null;
 
                     if (whiteKingAttacker) {
                         history[this.state.index].kingStatus = "White king in check!";
-                        console.debug("Piece putting white king in check:");
-                        console.debug(whiteKingAttacker)
                     } else if (blackKingAttacker) {
                         history[this.state.index].kingStatus = "Black king in check!";
-                        console.debug("Piece putting black king in check:");
-                        console.debug(blackKingAttacker)
                     } else {
                         history[this.state.index].kingStatus = "";
                     }
@@ -641,7 +613,8 @@ class Board extends React.Component {
                                             showCoords={this.state.showCoords}
                                             x={x}
                                             y={y}
-                                            isOnDeck={this.state.pieceToMove !== null && (this.state.pieceToMove.x === x && this.state.pieceToMove.y === y)}
+                                            highlight={this.state.pieceToMove && isValidMove(this.state.pieceToMove, {x: x, y: y}, this.state.history[this.state.index].pieces).isValid}
+                                            isOnDeck={this.state.pieceToMove && (this.state.pieceToMove.x === x && this.state.pieceToMove.y === y)}
                                             onClick={() => this.handleClick(x, y)}
                                             />
                                     );
