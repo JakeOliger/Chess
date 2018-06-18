@@ -5,7 +5,6 @@ import './index.css';
 /* INTERNAL TODO
  * - Add dialog for promotion
  * - Add win conditions
- * - Disallow moves that don't save the king from being in check
  * - Add captured piece icons to trays rather than listing them below the board
  * - Improve UI for moving pieces (e.g. allow dragging)
  * - Show where pieces can move, as an option
@@ -462,7 +461,8 @@ class Board extends React.Component {
         this.state = {
             history: [{
                 pieces: pieces,
-                captured: [],
+                whiteCaptured: [],
+                blackCaptured: [],
                 whitesTurn: true,
                 kingStatus: "",
             }],
@@ -504,11 +504,16 @@ class Board extends React.Component {
             if (move.isValid) {
                 var newState = {
                     whitesTurn: !this.state.history[this.state.index].whitesTurn || this.state.ignoreTurns,
-                    captured: this.state.history[this.state.index].captured.slice(),
+                    whiteCaptured: this.state.history[this.state.index].whiteCaptured.slice(),
+                    blackCaptured: this.state.history[this.state.index].blackCaptured.slice(),
                 };
 
                 if (move.capturedPiece) {
-                    newState.captured.push(move.capturedPiece);
+                    if (move.capturedPiece.team === WHITE) {
+                        newState.whiteCaptured.push(move.capturedPiece);
+                    } else {
+                        newState.blackCaptured.push(move.capturedPiece);
+                    }
                     removePiece(move.capturedPiece.x, move.capturedPiece.y, pieces);
                 }
 
@@ -536,8 +541,12 @@ class Board extends React.Component {
 
                     if (whiteKingAttacker) {
                         history[this.state.index].kingStatus = "White king in check!";
+                        console.log("White king attacker:");
+                        console.log(whiteKingAttacker);
                     } else if (blackKingAttacker) {
                         history[this.state.index].kingStatus = "Black king in check!";
+                        console.log("Black king attacker");
+                        console.log(blackKingAttacker);
                     } else {
                         history[this.state.index].kingStatus = "";
                     }
@@ -593,12 +602,29 @@ class Board extends React.Component {
                 {this.state.isReplaying ? "Stop Replay" : "Instant Replay"}
             </button>;
 
+        let whiteTrayOccupied = this.state.history[this.state.index].whiteCaptured.length > 0;
+        let blackTrayOccupied = this.state.history[this.state.index].blackCaptured.length > 0;
+        let whiteTrayClasses = ["pieceTray"];
+        let blackTrayClasses = ["pieceTray"];
+        if (whiteTrayOccupied) whiteTrayClasses.push("occupied");
+        if (blackTrayOccupied) blackTrayClasses.push("occupied");
+
         return (
             <div>
                 <p className="status-bar">
                     <span className="whos-turn">{this.state.history[this.state.index].whitesTurn ? "White's" : "Black's"} Turn</span>
                     <span className="king-status">{this.state.history[this.state.index].kingStatus}</span>
                 </p>
+                <div className={blackTrayClasses.join(" ")}>
+                    {this.state.history[this.state.index].blackCaptured.map((piece, index) => {
+                        let type = PIECE_NAME_LC[piece.type];
+                        let typeUc = PIECE_NAME[piece.type];
+                        let team = TEAM_NAME[piece.team];
+                        return (
+                            <img key={index} className={type} src={require(`../public/images/${type}.png`)} alt={`${team} ${typeUc}`} />
+                        );
+                    })}
+                </div>
                 <table>
                     <tbody>
                     {[0, 1, 2, 3, 4, 5, 6, 7].map((i, y) => {
@@ -624,23 +650,18 @@ class Board extends React.Component {
                     })}
                     </tbody>
                 </table>
-                {/*<div class="pieceTray">
-                    {this.state.history[this.state.index].captured.map((piece, index) => {
-                        let type = piece.type;
+                <div className={whiteTrayClasses.join(" ")}>
+                    {this.state.history[this.state.index].whiteCaptured.map((piece, index) => {
+                        let type = PIECE_NAME[piece.type];
+                        let typeLc = PIECE_NAME_LC[piece.type];
+                        let team = TEAM_NAME[piece.team];
+                        let teamLc = TEAM_NAME_LC[piece.team];
                         return (
-                            <img src={require(`../public/images/${type}.png`)} />
+                            <img key={index} className={teamLc} src={require(`../public/images/${typeLc}.png`)} alt={`${team} ${type}`} />
                         );
                     })}
-                </div>*/}
+                </div>
                 <div>{replay}</div>
-                <h3 className="subtitle">Captured Pieces</h3>
-                <ul id="capturedPieces">
-                    {this.state.history[this.state.index].captured.map((piece, index) => {
-                        return (
-                            <li key={index}>{TEAM_NAME[piece.team]} {PIECE_NAME[piece.type]}</li>
-                        );
-                    })}
-                </ul>
             </div>
         );
     }
