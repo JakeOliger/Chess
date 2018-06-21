@@ -21,6 +21,7 @@ class Pc {
         this.team = team;
         this.hasMoved = false;
         this.justDoubleMoved = false;
+        this.moves = {};
         if (x !== undefined) this.x = x;
         if (y !== undefined) this.y = y;
     }
@@ -68,6 +69,26 @@ const BISHOP_MOVES = (x, y, directionX, directionY) => {
         y: y + directionY,
     };
 };
+const KNIGHT_MOVES = [
+    {x: -2, y: -1},
+    {x: -1, y: -2},
+    {x: 1,  y: -2},
+    {x: 2,  y: -1},
+    {x: 2,  y: 1},
+    {x: 1,  y: 2},
+    {x: -1, y: 2},
+    {x: -2, y: 1},
+];
+const KING_MOVES = [
+    {x: 0, y: 1},
+    {x: 1, y: 1},
+    {x: 1, y: 0},
+    {x: 1, y: -1},
+    {x: 0, y: -1},
+    {x: -1, y: -1},
+    {x: -1, y: 0},
+    {x: -1, y: 1},
+];
 
 var regulationStartingPieces = {
     "0,0": new Pc(R, W), "1,0": new Pc(KN, W), "2,0": new Pc(BI, W), "3,0": new Pc(KI, W),
@@ -286,12 +307,31 @@ function isValidMove(piece, dest, pieces) {
     };
 }
 
-function addMove(moves, pieces, piece, to, captured = null) {
+/**
+ * Adds a move to a moves list, if it's valid
+ *
+ * @param {*} moves List of moves for the move to be added to
+ * @param {*} pieces State of the game board
+ * @param {*} piece Piece to be moved
+ * @param {*} to Place to move the piece
+ * @param {*} [captured=null] A captured piece, if a piece was captured
+ * @param {*} [additionalMove=null] A move necessarily tied to this move, e.g. the rook when castling
+ * @returns The move object added, or null if no move takes place
+ */
+function addMove(moves, pieces, piece, to, captured = null, additionalMove = null) {
+    let temp_pieces = JSON.parse(JSON.stringify(pieces));
+    removePiece(to.x, to.y, temp_pieces);
+    if (movePiece(piece, to, temp_pieces)) {
+        if (isKingInCheck(piece.team, temp_pieces)) {
+            return null;
+        }
+    }
     let id = `${to.x},${to.y}`;
     moves[id] = {
-        piece: piece,
+        from: {x: piece.x, y: piece.y},
         to: to,
-        captured: captured,
+        captured: captured !== null ? {x: captured.x, y: captured.y} : null,
+        additionalMove: additionalMove,
     };
     return moves[id];
 }
@@ -308,13 +348,13 @@ function getPieceMoves(piece, pieces) {
     if (!piece || !piece.hasOwnProperty('type')) return null;
     
     var directions = [-1, 1];
-    var moves = [/*
+    var moves = {/*
         {
-            piece: moving piece with x and y properties,
+            from: x and y location of piece being moved,
             to: where the piece is moving to,
-            captured: the piece captured if a capture occurs
+            captured: x and y location of captured piece
         }
-    */];
+    */};
 
     switch (piece.type) {
         case PAWN:
@@ -379,21 +419,13 @@ function getPieceMoves(piece, pieces) {
             }
             break;
         case KNIGHT:
-            let possibleMoves = [
-                {x: -2, y: -1},
-                {x: -1, y: -2},
-                {x: 1,  y: -2},
-                {x: 2,  y: -1},
-                {x: 2,  y: 1},
-                {x: 1,  y: 2},
-                {x: -1, y: 2},
-                {x: -2, y: 1},
-            ];
-            for (let i = 0; i < possibleMoves.length; i++) {
-                let potentialCapture = getPiece(possibleMoves[i].x, possibleMoves[i].y, pieces);
+            for (let i = 0; i < KNIGHT_MOVES.length; i++) {
+                let x = piece.x + KNIGHT_MOVES[i].x;
+                let y = piece.y + KNIGHT_MOVES[i].y;
+                let potentialCapture = getPiece(x, y, pieces);
                 if (potentialCapture === undefined) continue;
                 if (potentialCapture === null || potentialCapture.team !== piece.team) {
-                    addMove(moves, pieces, piece, {x: possibleMoves[i].x, y: possibleMoves[i].y}, potentialCapture);
+                    addMove(moves, pieces, piece, {x: x, y: y}, potentialCapture);
                 }
             }
             break;
@@ -440,6 +472,44 @@ function getPieceMoves(piece, pieces) {
             }
             break;
         case KING:
+            // Regular move
+            for (let i = 0; i < KING_MOVES.length; i++) {
+                let x = piece.x + KING_MOVES[i].x;
+                let y = piece.y + KING_MOVES[i].y;
+                let potentialCapture = getPiece(x, y, pieces);
+                if (potentialCapture === undefined) continue;
+                if (potentialCapture === null || potentialCapture.team !== piece.team) {
+                    addMove(moves, pieces, piece, {x: x, y: y}, potentialCapture);
+                }
+            }
+            // Castling
+            if (!piece.hasMoved) {
+                let leftRook = getPiece(0, piece.y, pieces);
+                let rightRook = getPiece(7, piece.y, pieces);
+                if (leftRook &&
+                    !leftRook.hasMoved &&
+                    getPiece(1, piece.y, pieces) === null &&
+                    getPiece(2, piece.y, pieces) === null &&
+                    !isSpaceInCheck({x: 2, y: piece.y}, piece.team, pieces)) {
+                    addMove(moves, pieces, piece, {x: 1, y: piece.y}, null, {
+                        from: {x: leftRook.x, y: leftRook.y},
+                        to: {x: 2, y: piece.y},
+                        captured: null,
+                    });
+                }
+                if (rightRook &&
+                    !rightRook.hasMoved &&
+                    getPiece(4, piece.y, pieces) === null &&
+                    getPiece(5, piece.y, pieces) === null &&
+                    getPiece(6, piece.y, pieces) === null &&
+                    !isSpaceInCheck({x: 4, y: piece.y}, piece.team, pieces)) {
+                    addMove(moves, pieces, piece, {x: 5, y: piece.y}, null, {
+                        from: {x: rightRook.x, y: rightRook.y},
+                        to: {x: 4, y: piece.y},
+                        captured: null,
+                    });
+                }
+            }
             break;
         default:
     }
@@ -491,14 +561,21 @@ function getPieceMoves(piece, pieces) {
     return null;
 }*/
 function isKingInCheck(team, pieces) {
-    let kingCoord = team === WHITE ? pieces.whiteKing : pieces.blackKing;
-    for (let coord in pieces) {
-        if (!pieces.hasOwnProperty(coord) || !pieces[coord].hasOwnProperty('moves')) {
+    let king = team === WHITE ? pieces.whiteKing : pieces.blackKing;
+    return isSpaceInCheck(king, team, pieces);
+}
+
+function isSpaceInCheck(coord, victimTeam, pieces) {
+    if (typeof coord === 'object') {
+        coord = `${coord.x},${coord.y}`;
+    }
+    for (let i in pieces) {
+        if (!pieces.hasOwnProperty(i) || !pieces[i].hasOwnProperty('team') || !pieces[i].hasOwnProperty('moves')) {
             continue;
         }
 
-        if (pieces[coord].moves.hasOwnProperty(kingCoord)) {
-            return true;
+        if (pieces[i].team !== victimTeam && pieces[i].moves.hasOwnProperty(coord)) {
+            return {x: pieces[i].x, y: pieces[i].y};
         }
     }
     return false;
@@ -604,9 +681,9 @@ function updatePieceMoves(pieces, changedCoords = []) {
                 continue;
             }
         }
-        
         pieces[coord].moves = getPieceMoves(pieces[coord], pieces);
     }
+    //console.log(JSON.stringify(pieces));
 }
 
 /**
@@ -713,18 +790,16 @@ class Board extends React.Component {
     handleClick(x, y) {
         if (this.state.isReplaying) return;
 
-        var pieceToMove = this.state.pieceToMove;
         var pieces = JSON.parse(JSON.stringify(this.state.history[this.state.index].pieces));
+        var pieceToMove = this.state.pieceToMove ? getPiece(this.state.pieceToMove.x, this.state.pieceToMove.y, pieces) : null;
         var clickedPiece = getPiece(x, y, pieces);
 
-        if (this.state.pieceToMove === null) {
+        if (pieceToMove === null) {
             if (clickedPiece !== null && clickedPiece.team === (this.state.history[this.state.index].whitesTurn ? WHITE : BLACK)) {
-                clickedPiece.x = x;
-                clickedPiece.y = y;
                 this.setState({
-                    pieceToMove: clickedPiece,
+                    pieceToMove: {x: clickedPiece.x, y: clickedPiece.y},
                 });
-                getPieceMoves(clickedPiece, pieces);
+                console.debug(clickedPiece.moves);
             }
         } else {
             var move = isValidMove(pieceToMove, {x: x, y: y}, pieces);
@@ -756,8 +831,9 @@ class Board extends React.Component {
                     moves.push(`${move.moves[i].start.x},${move.moves[i].start.y}`);
                     moves.push(`${move.moves[i].end.x},${move.moves[i].end.y}`);
                 }
-                updatePieceMoves(pieces, moves);
-    
+                updatePieceMoves(pieces);
+
+                console.debug(JSON.stringify(pieces));
                 newState.pieces = JSON.parse(JSON.stringify(pieces));
 
                 var history = this.state.history.slice();
@@ -770,17 +846,15 @@ class Board extends React.Component {
                     let history = this.state.history.slice();
                     let pieces = JSON.parse(JSON.stringify(history[this.state.index].pieces));
 
+                    //console.debug(pieces);
+
                     let whiteKingAttacker = isKingInCheck(WHITE, pieces);
                     let blackKingAttacker = isKingInCheck(BLACK, pieces);
 
                     if (whiteKingAttacker) {
                         history[this.state.index].kingStatus = "White king in check!";
-                        console.debug("White king attacker:");
-                        console.debug(whiteKingAttacker);
                     } else if (blackKingAttacker) {
                         history[this.state.index].kingStatus = "Black king in check!";
-                        console.debug("Black king attacker");
-                        console.debug(blackKingAttacker);
                     } else {
                         history[this.state.index].kingStatus = "";
                     }
@@ -843,6 +917,9 @@ class Board extends React.Component {
         if (whiteTrayOccupied) whiteTrayClasses.push("occupied");
         if (blackTrayOccupied) blackTrayClasses.push("occupied");
 
+        let pieces = JSON.parse(JSON.stringify(this.state.history[this.state.index].pieces));
+        updatePieceMoves(pieces);
+
         return (
             <div>
                 <p className="status-bar">
@@ -865,13 +942,14 @@ class Board extends React.Component {
                         return (
                             <tr key={i}>
                                 {[0, 1, 2, 3, 4, 5, 6, 7].map((j, x) => {
+                                    let id = `${x},${y}`;
                                     return (
                                         <Space
-                                            key={x + "," + y}
-                                            pos={x + "," + y}
-                                            piece={getPiece(x, y, this.state.history[this.state.index].pieces)}
+                                            key={id}
+                                            pos={id}
+                                            piece={getPiece(x, y, pieces)}
                                             showCoords={this.state.showCoords}
-                                            highlight={this.state.pieceToMove && isValidMove(this.state.pieceToMove, {x: x, y: y}, this.state.history[this.state.index].pieces).isValid}
+                                            highlight={this.state.pieceToMove && getPiece(this.state.pieceToMove.x, this.state.pieceToMove.y, pieces).moves.hasOwnProperty(id)}
                                             isOnDeck={this.state.pieceToMove && (this.state.pieceToMove.x === x && this.state.pieceToMove.y === y)}
                                             onClick={() => this.handleClick(x, y)}
                                             />
