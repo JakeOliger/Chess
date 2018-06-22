@@ -6,7 +6,6 @@ import './index.css';
  * - Add dialog for promotion
  * - Add win conditions
  * - Improve UI for moving pieces (e.g. allow dragging)
- * - Show where pieces can move, as an option
  * - Make board resizable
  * - Make board flippable
  * 
@@ -40,24 +39,8 @@ var TEAM_NAME_LC = [
 
 var [PAWN, ROOK, KNIGHT, BISHOP, QUEEN, KING] = [1, 2, 3, 4, 5, 6];
 var [P, R, KN, BI, Q, KI] = [PAWN, ROOK, KNIGHT, BISHOP, QUEEN, KING];
-var PIECE_NAME = [
-    "",
-    "Pawn",
-    "Rook",
-    "Knight",
-    "Bishop",
-    "Queen",
-    "King",
-];
-var PIECE_NAME_LC = [
-    "",
-    "pawn",
-    "rook",
-    "knight",
-    "bishop",
-    "queen",
-    "king",
-];
+var PIECE_NAME =    ["", "Pawn", "Rook", "Knight", "Bishop", "Queen", "King"];
+var PIECE_NAME_LC = ["", "pawn", "rook", "knight", "bishop", "queen", "king"];
 
 const ROOK_MOVES = [
     (x, y, direction) => { return {x: x, y: y + direction} },
@@ -349,7 +332,7 @@ function getPieceMoves(piece, pieces) {
     
     var directions = [-1, 1];
     var moves = {/*
-        {
+        toCoord: {
             from: x and y location of piece being moved,
             to: where the piece is moving to,
             captured: x and y location of captured piece
@@ -513,17 +496,6 @@ function getPieceMoves(piece, pieces) {
             break;
         default:
     }
-    /*
-    console.log(`MOVES FOR ${TEAM_NAME[piece.team]} ${PIECE_NAME[piece.type]}`);
-
-    for (let m in moves) {
-        if (moves.hasOwnProperty(m)) {
-            console.log(`Valid move (${m}):`);
-            console.log(moves[m].to);
-            if (moves[m].captured)
-                console.log(moves[m].captured);
-        }
-    }*/
 
     return moves;
 }
@@ -536,30 +508,6 @@ function getPieceMoves(piece, pieces) {
  * @param {*} kingTeam The team of the king, used for hypothetical king positions
  * @returns The checking piece if found, null otherwise
  */
-/*function isKingInCheck(king, pieces, kingTeam) {
-    if (king == null) {
-        console.error("Invalid parameter given: king is null or undefined");
-        return null;
-    }
-    let hypothetical = king.team == null;
-    if (kingTeam === undefined) {
-        kingTeam = !hypothetical ? king.team : null;
-    }
-    if (kingTeam == null) {
-        console.error("King team could not be determined");
-        return null;
-    }
-    for (let coord in pieces) {
-        if (!["whiteKing", "blackKing", "lastMoved"].includes(coord) && pieces.hasOwnProperty(coord)) {
-            let pieceIsKing = pieces[coord].x === king.x && pieces[coord].y === king.y;
-            if (pieces[coord] === null || pieceIsKing) continue;
-            if (kingTeam === pieces[coord].team) continue;
-            let move = isValidMove(pieces[coord], king, pieces);
-            if (move.capturedPiece) return pieces[coord];
-        }
-    }
-    return null;
-}*/
 function isKingInCheck(team, pieces) {
     let king = team === WHITE ? pieces.whiteKing : pieces.blackKing;
     return isSpaceInCheck(king, team, pieces);
@@ -682,8 +630,8 @@ function updatePieceMoves(pieces, changedCoords = []) {
             }
         }
         pieces[coord].moves = getPieceMoves(pieces[coord], pieces);
+        console.log(coord + ": " + JSON.stringify(pieces[coord].moves));
     }
-    //console.log(JSON.stringify(pieces));
 }
 
 /**
@@ -799,7 +747,7 @@ class Board extends React.Component {
                 this.setState({
                     pieceToMove: {x: clickedPiece.x, y: clickedPiece.y},
                 });
-                console.debug(clickedPiece.moves);
+                //console.debug(clickedPiece.moves);
             }
         } else {
             var move = isValidMove(pieceToMove, {x: x, y: y}, pieces);
@@ -833,37 +781,39 @@ class Board extends React.Component {
                 }
                 updatePieceMoves(pieces);
 
-                console.debug(JSON.stringify(pieces));
-                newState.pieces = JSON.parse(JSON.stringify(pieces));
+                let whiteKingAttacker = isKingInCheck(WHITE, pieces);
+                let blackKingAttacker = isKingInCheck(BLACK, pieces);
 
+                if (whiteKingAttacker) {
+                    newState.kingStatus = "White king in check!";
+                } else if (blackKingAttacker) {
+                    newState.kingStatus = "Black king in check!";
+                } else {
+                    newState.kingStatus = "";
+                }
+
+                // console.log("----------------------------------------");
+                // console.log("NEW STATE UPDATE");
+                // console.log("----------------------------------------");
+                // for (let p in pieces) {
+                //     if (pieces.hasOwnProperty(p)) {
+                //         console.log(p + ": " + JSON.stringify(pieces[p]));
+                //     }
+                // }
+
+                newState.pieces = JSON.parse(JSON.stringify(pieces));
+                
                 var history = this.state.history.slice();
                 history.push(newState);
+
                 this.setState({
                     history: history,
+                    pieceToMove: null,
                     index: this.state.index + 1,
-                }, () => {
-                    // Check whether or not the king is in check
-                    let history = this.state.history.slice();
-                    let pieces = JSON.parse(JSON.stringify(history[this.state.index].pieces));
-
-                    //console.debug(pieces);
-
-                    let whiteKingAttacker = isKingInCheck(WHITE, pieces);
-                    let blackKingAttacker = isKingInCheck(BLACK, pieces);
-
-                    if (whiteKingAttacker) {
-                        history[this.state.index].kingStatus = "White king in check!";
-                    } else if (blackKingAttacker) {
-                        history[this.state.index].kingStatus = "Black king in check!";
-                    } else {
-                        history[this.state.index].kingStatus = "";
-                    }
-
-                    history[this.state.index].pieces = pieces;
-                    this.setState({history: history});
                 });
+            } else {
+                this.resetTurn();
             }
-            this.resetTurn();
         }
     }
 
@@ -918,7 +868,17 @@ class Board extends React.Component {
         if (blackTrayOccupied) blackTrayClasses.push("occupied");
 
         let pieces = JSON.parse(JSON.stringify(this.state.history[this.state.index].pieces));
-        updatePieceMoves(pieces);
+        
+        // console.debug("----------------------------------------");
+        // console.debug("RENDER");
+        // console.debug("----------------------------------------");
+
+        // for (let p in pieces) {
+        //     if (pieces.hasOwnProperty(p)) {
+        //         console.debug(p + ": " + JSON.stringify(pieces[p]));
+        //     }
+        // }
+        //updatePieceMoves(pieces);
 
         return (
             <div>
